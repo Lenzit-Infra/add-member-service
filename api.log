@@ -1,0 +1,22 @@
+nohup: ignoring input
+INFO:     Started server process [3209357]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:4747 (Press CTRL+C to quit)
+INFO:     127.0.0.1:39484 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:39484 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:39488 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39488 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52340 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52340 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51572 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51572 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+INFO:telethon.client.users:Phone migrated to 4
+INFO:telethon.client.telegrambaseclient:Reconnecting to new data center 4
+INFO:telethon.network.mtprotosender:Disconnecting from 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Disconnection from 149.154.167.51:443/TcpFull complete!
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.92:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.92:443/TcpFull complete!
+INFO:     127.0.0.1:51578 - "POST /api/v1/auth/request-code HTTP/1.1" 200 OK

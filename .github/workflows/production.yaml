@@ -1,0 +1,145 @@
+name: Production Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+# Permissions for GitHub Pages deployment
+permissions:
+  contents: write
+
+jobs:
+  # ====================================================
+  # JOB 1: PUBLISH TO PYPI (Conditional)
+  # ====================================================
+  publish-pypi:
+    runs-on: ubuntu-latest
+    # Condition: Run only if commit message contains specific trigger phrase
+    if: contains(github.event.head_commit.message, 'pipy commit -push')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Build Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build and Publish Package
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m build
+          twine upload dist/*
+
+  # ====================================================
+  # JOB 2: DEPLOY FRONTEND (GitHub Pages)
+  # ====================================================
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        working-directory: ./dashboard
+        run: npm ci
+
+      - name: Build React App
+        working-directory: ./dashboard
+        env:
+          # Inject Server URL from GitHub Secrets into React build
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dashboard/dist
+          force_orphan: true # Clear history for a clean deploy branch
+
+  # ====================================================
+  # JOB 3: DEPLOY BACKEND (VPS via SSH)
+  # ====================================================
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: [deploy-frontend] # Wait for frontend to complete
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASS }}
+          script: |
+            # 1. Setup Environment Variables
+            export PATH="/home/${{ secrets.VPS_USER }}/miniconda3/bin:$PATH"
+            source ~/miniconda3/etc/profile.d/conda.sh
+            conda activate tg_bot
+            
+            # 2. Navigate to Project Directory
+            cd ~/projects/telegram-bot
+            
+            # 3. Pull Latest Code
+            # Reset local changes to avoid conflicts during pull
+            git reset --hard
+            git pull origin main
+            
+            # 4. Install Dependencies
+            pip install -r requirements.txt
+            # Re-install local package to apply setup.py changes
+            pip install .
+            
+            # 5. Stop Old Services
+            echo "Stopping running services..."
+            pkill -f "run_api.py" || true
+            pkill -f "run_worker.py" || true
+            
+            # Wait for ports to release
+            sleep 3
+            
+            # 6. Start New Services
+            echo "Starting new services..."
+            # Run API and Worker in background with nohup
+            nohup python run_api.py > api.log 2>&1 &
+            nohup python run_worker.py > worker.log 2>&1 &
+            
+            echo "Backend deployment finished successfully."
+
+  # ====================================================
+  # JOB 4: HEALTH CHECK
+  # ====================================================
+  health-check:
+    runs-on: ubuntu-latest
+    needs: [deploy-backend]
+    steps:
+      - name: Verify Backend Connection
+        env:
+          API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          echo "Waiting for API to initializze..."
+          sleep 15
+          
+          echo "Checking connectivity to docs endpoint: $API_URL/docs"
+          # Send a request to Swagger docs to verify status 200
+          HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}\n" $API_URL/docs)
+          
+          if [ "$HTTP_STATUS" == "200" ]; then
+            echo "SUCCESS: Backend is ONLINE and reachable."
+          else
+            echo "FAILED: Backend returned status $HTTP_STATUS"
+            exit 1
+          fi
