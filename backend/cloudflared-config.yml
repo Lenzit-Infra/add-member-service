@@ -1,0 +1,14 @@
+# Cloudflare Tunnel config — exposes the locally-running backend as
+# https://api.lenzit.ir without opening any router ports.
+#
+# Fill in <TUNNEL_ID> after running `cloudflared tunnel create lenzit-backend`
+# (it prints the ID, and writes credentials to %USERPROFILE%\.cloudflared\<TUNNEL_ID>.json).
+# See DEPLOYMENT.md for the full one-time setup.
+
+tunnel: <TUNNEL_ID>
+credentials-file: C:\Users\%USERNAME%\.cloudflared\<TUNNEL_ID>.json
+
+ingress:
+  - hostname: api.lenzit.ir
+    service: http://localhost:4747
+  - service: http_status:404

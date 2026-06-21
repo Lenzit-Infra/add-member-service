@@ -34,6 +34,10 @@ ENV/
 # Environment Variables (CRITICAL: Never commit this file)
 .env
 
+# SQLite DB (contains Telegram agent session strings — never commit)
+*.db
+*.db-journal
+
 # Jupyter Notebooks (If you use them for testing)
 .ipynb_checkpoints
 
