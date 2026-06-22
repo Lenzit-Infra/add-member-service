@@ -1,12 +1,14 @@
 # Cloudflare Tunnel config — exposes the locally-running backend as
 # https://api.lenzit.ir without opening any router ports.
-#
-# Fill in <TUNNEL_ID> after running `cloudflared tunnel create lenzit-backend`
-# (it prints the ID, and writes credentials to %USERPROFILE%\.cloudflared\<TUNNEL_ID>.json).
-# See DEPLOYMENT.md for the full one-time setup.
+# Tunnel "lenzit-backend", created 2026-06-22.
 
-tunnel: <TUNNEL_ID>
-credentials-file: C:\Users\%USERNAME%\.cloudflared\<TUNNEL_ID>.json
+tunnel: fd9a2b35-283c-4eb9-947f-2413cbb3055c
+credentials-file: C:\Users\ASUS\.cloudflared\fd9a2b35-283c-4eb9-947f-2413cbb3055c.json
+
+# This network blocks outbound QUIC/UDP (port 7844) — without this, cloudflared
+# spends ~60s retrying QUIC before giving up, and the Windows service never got
+# that far at all. Pin straight to HTTP/2, which works fine here.
+protocol: http2
 
 ingress:
   - hostname: api.lenzit.ir
