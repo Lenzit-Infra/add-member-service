@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.agent import Agent
 from app.repositories.analytics_repo import AnalyticsRepository
+from app.modules.account.dependencies import require_permission
 
 router = APIRouter()
 
@@ -12,7 +13,7 @@ def _get_agent_or_404(agent_id: int, db: Session) -> Agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     return agent
 
-@router.patch("/{agent_id}/toggle-active")
+@router.patch("/{agent_id}/toggle-active", dependencies=[Depends(require_permission("agents.manage"))])
 def toggle_active(agent_id: int, db: Session = Depends(get_db)):
     agent = _get_agent_or_404(agent_id, db)
     agent.is_active = not agent.is_active
@@ -21,7 +22,7 @@ def toggle_active(agent_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "id": agent.id, "is_active": agent.is_active}
 
-@router.patch("/{agent_id}/toggle-ban")
+@router.patch("/{agent_id}/toggle-ban", dependencies=[Depends(require_permission("agents.manage"))])
 def toggle_ban(agent_id: int, db: Session = Depends(get_db)):
     agent = _get_agent_or_404(agent_id, db)
     agent.is_banned = not agent.is_banned
@@ -29,7 +30,7 @@ def toggle_ban(agent_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "id": agent.id, "is_banned": agent.is_banned}
 
-@router.delete("/{agent_id}")
+@router.delete("/{agent_id}", dependencies=[Depends(require_permission("agents.manage"))])
 def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     agent = _get_agent_or_404(agent_id, db)
     db.delete(agent)

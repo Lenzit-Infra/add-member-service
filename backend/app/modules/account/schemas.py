@@ -1,3 +1,4 @@
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 
 
@@ -23,3 +24,20 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class CreateUserRequest(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    role: str
+
+
+class UpdateUserRequest(BaseModel):
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    new_password: Optional[str] = None
+
+
+class RolePermissionsUpdate(BaseModel):
+    permissions: List[str]

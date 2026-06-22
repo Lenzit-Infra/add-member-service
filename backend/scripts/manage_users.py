@@ -14,8 +14,10 @@ import argparse
 from app.core.database import Base, engine, SessionLocal
 from app.core.migrations import run_lightweight_migrations
 from app.core import security
+from app.core.permissions import ROLES
 from app.models.user import User
-from app.models import agent, group, member, order, logs, settings, user as _user  # noqa: registers all tables
+from app.models import agent, group, member, order, logs, settings, user as _user, audit_log  # noqa: registers all tables
+from app.services import audit
 
 Base.metadata.create_all(bind=engine)
 run_lightweight_migrations(engine)
@@ -24,6 +26,9 @@ run_lightweight_migrations(engine)
 def create_user(username: str, email: str, password: str, role: str = "admin"):
     username = username.strip().lower()
     email = email.strip().lower()
+    if role not in ROLES:
+        print(f"Role must be one of: {', '.join(ROLES)}")
+        return
     if len(password) < 8:
         print("Password must be at least 8 characters.")
         return
@@ -42,6 +47,7 @@ def create_user(username: str, email: str, password: str, role: str = "admin"):
         )
         db.add(new_user)
         db.commit()
+        audit.log_action(db, "cli", "user.create", f"user:{username}", f"role={role}")
         print(f"Created user '{username}' <{email}>, role={role}. You can log in now.")
     finally:
         db.close()
@@ -64,6 +70,7 @@ def reset_password(username: str, new_password: str):
         target.failed_attempts = 0
         target.locked_until = None
         db.commit()
+        audit.log_action(db, "cli", "user.password_reset", f"user:{username}")
         print(f"Password updated for '{username}'. Any existing logged-in sessions were invalidated.")
     finally:
         db.close()

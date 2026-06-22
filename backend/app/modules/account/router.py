@@ -5,11 +5,21 @@ from app.core.database import get_db
 from app.core import security, config
 from app.models.user import User
 from app.repositories.settings_repo import SettingsRepository
-from .schemas import LoginRequest, ClaimAdminRequest, ClaimAdminComplete, ForgotPasswordRequest, ResetPasswordRequest
+from app.services import audit
+from .schemas import (
+    LoginRequest, ClaimAdminRequest, ClaimAdminComplete, ForgotPasswordRequest, ResetPasswordRequest,
+    CreateUserRequest, UpdateUserRequest, RolePermissionsUpdate,
+)
 from .service import AccountService
-from .dependencies import get_current_user
+from .dependencies import get_current_user, require_permission
 
 router = APIRouter()
+
+
+def _client_ip(request: Request) -> str:
+    # Traffic arrives via the Cloudflare Tunnel — prefer the header Cloudflare
+    # sets to the real visitor IP over the tunnel's local connection address.
+    return request.headers.get("CF-Connecting-IP") or (request.client.host if request.client else None)
 
 REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/v1/account"
@@ -40,9 +50,9 @@ def _user_public(user: User) -> dict:
 
 
 @router.post("/login")
-def login(data: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(data: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     service = AccountService(db)
-    user = service.authenticate(data.username_or_email, data.password)
+    user = service.authenticate(data.username_or_email, data.password, client_ip=_client_ip(request))
     _set_refresh_cookie(response, user, db)
     return {"access_token": _create_access_token(user, db), "user": _user_public(user)}
 
@@ -100,3 +110,68 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
 def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     AccountService(db).reset_password(data.token, data.new_password)
     return {"status": "success", "message": "Password updated. You can now log in."}
+
+
+def _user_full(user: User) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "last_login_ip": user.last_login_ip,
+        "locked_until": user.locked_until.isoformat() if user.locked_until else None,
+    }
+
+
+@router.get("/users", dependencies=[Depends(require_permission("users.manage"))])
+def list_users(db: Session = Depends(get_db)):
+    return [_user_full(u) for u in AccountService(db).list_users()]
+
+
+@router.post("/users", dependencies=[Depends(require_permission("users.manage"))])
+def create_user(data: CreateUserRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = AccountService(db).create_user(data.username, data.email, data.password, data.role, current_user.username)
+    return _user_full(user)
+
+
+@router.patch("/users/{user_id}", dependencies=[Depends(require_permission("users.manage"))])
+def update_user(user_id: int, data: UpdateUserRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = AccountService(db).update_user(
+        user_id, current_user, role=data.role, is_active=data.is_active, new_password=data.new_password
+    )
+    return _user_full(user)
+
+
+@router.delete("/users/{user_id}", dependencies=[Depends(require_permission("users.manage"))])
+def delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    AccountService(db).delete_user(user_id, current_user)
+    return {"status": "success", "id": user_id}
+
+
+@router.get("/roles", dependencies=[Depends(require_permission("roles.manage"))])
+def list_roles(db: Session = Depends(get_db)):
+    return AccountService(db).list_roles()
+
+
+@router.post("/roles/{role}/permissions", dependencies=[Depends(require_permission("roles.manage"))])
+def update_role_permissions(role: str, data: RolePermissionsUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    updated = AccountService(db).set_role_permissions(role, data.permissions, current_user.username)
+    return {"role": role, "permissions": sorted(updated)}
+
+
+@router.get("/audit-log", dependencies=[Depends(require_permission("users.manage"))])
+def get_audit_log(db: Session = Depends(get_db)):
+    return [
+        {
+            "id": a.id,
+            "actor_username": a.actor_username,
+            "action": a.action,
+            "target": a.target,
+            "details": a.details,
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+        }
+        for a in audit.get_recent(db)
+    ]

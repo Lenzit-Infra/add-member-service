@@ -6,3 +6,4 @@ from .logs import OperationLog, MemberMovement
 from .common import OrderStatus, OperationStatus, MemberStatus
 from .settings import SystemSetting
 from .user import User
+from .audit_log import AuditLog

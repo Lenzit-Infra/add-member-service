@@ -16,7 +16,7 @@ from app.core.database import Base, engine, SessionLocal
 from app.core.migrations import run_lightweight_migrations
 from app.repositories.settings_repo import SettingsRepository
 # Import all models to ensure tables are created
-from app.models import agent, group, member, order, logs, user, settings
+from app.models import agent, group, member, order, logs, user, settings, audit_log
 import time
 
 # Ensure all database tables are created + apply lightweight migrations

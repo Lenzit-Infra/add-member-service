@@ -24,3 +24,4 @@ class User(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login_at = Column(DateTime, nullable=True)
+    last_login_ip = Column(String, nullable=True)

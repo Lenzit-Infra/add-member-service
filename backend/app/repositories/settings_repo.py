@@ -3,8 +3,13 @@ from sqlalchemy.orm import Session
 from app.models.settings import SystemSetting
 from app.core.settings_schema import SETTINGS_SCHEMA
 from app.core import config
+from app.core.permissions import DEFAULT_ROLE_PERMISSIONS
 
 ADMIN_EMAILS_KEY = "admin_emails"
+
+
+def _role_permissions_key(role: str) -> str:
+    return f"role_permissions_{role}"
 
 
 class SettingsRepository:
@@ -43,6 +48,11 @@ class SettingsRepository:
                 "Admin allowlist — seeded once from .env ADMIN_EMAILS, managed live from here after.",
             )
 
+        for role, default_perms in DEFAULT_ROLE_PERMISSIONS.items():
+            key = _role_permissions_key(role)
+            if not self.get_setting(key):
+                self.set_setting(key, ",".join(sorted(default_perms)), f"Configurable permissions for the '{role}' role.")
+
     # --- Admin email allowlist (the live source of truth; .env is only the first-run seed) ---
 
     def get_admin_emails(self) -> list:
@@ -65,3 +75,21 @@ class SettingsRepository:
         emails = [e for e in emails if e != email]
         self.set_setting(ADMIN_EMAILS_KEY, ",".join(emails))
         return emails
+
+    # --- Role permissions (admin is always fixed/full — see app.core.permissions) ---
+
+    def get_role_permissions(self, role: str) -> set:
+        if role == "admin":
+            return set()  # irrelevant — role_has_permission() short-circuits for admin
+        raw = self.get_setting(_role_permissions_key(role), "")
+        return {p.strip() for p in raw.split(",") if p.strip()}
+
+    def set_role_permissions(self, role: str, permissions: list) -> set:
+        from app.core.permissions import PERMISSION_KEYS
+        if role == "admin":
+            raise ValueError("The admin role's permissions are fixed and can't be edited.")
+        if role not in DEFAULT_ROLE_PERMISSIONS:
+            raise ValueError(f"Unknown role '{role}'.")
+        valid = {p for p in permissions if p in PERMISSION_KEYS}
+        self.set_setting(_role_permissions_key(role), ",".join(sorted(valid)))
+        return valid

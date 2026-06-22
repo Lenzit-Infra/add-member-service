@@ -4,6 +4,7 @@ from app.core.database import get_db
 from app.repositories.analytics_repo import AnalyticsRepository
 from app.repositories.order_repo import OrderRepository
 from app.models.order import Order, OrderStatus, OrderSourceGroup
+from app.modules.account.dependencies import require_permission
 from .schemas import OrderCreate, OrderAction
 
 router = APIRouter()
@@ -13,7 +14,7 @@ def get_orders(db: Session = Depends(get_db)):
     repo = AnalyticsRepository(db)
     return repo.get_order_details()
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(require_permission("orders.manage"))])
 async def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     # اینجا برای سادگی فعلا کلاینت تلگرام را None رد میکنیم چون سرویس شما قبلا CLI بود
     # در معماری صحیح، OrderService نباید در لحظه ساخت نیاز به کلاینت داشته باشد.
@@ -58,7 +59,7 @@ ACTION_TO_STATUS = {
     "cancel": OrderStatus.CANCELLED,
 }
 
-@router.post("/{order_id}/action")
+@router.post("/{order_id}/action", dependencies=[Depends(require_permission("orders.manage"))])
 def order_action(order_id: int, action: OrderAction, db: Session = Depends(get_db)):
     new_status = ACTION_TO_STATUS.get(action.type)
     if not new_status:
@@ -70,7 +71,7 @@ def order_action(order_id: int, action: OrderAction, db: Session = Depends(get_d
 
 DELETABLE_STATUSES = {OrderStatus.CANCELLED, OrderStatus.FINISHED}
 
-@router.delete("/{order_id}")
+@router.delete("/{order_id}", dependencies=[Depends(require_permission("orders.manage"))])
 def delete_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:

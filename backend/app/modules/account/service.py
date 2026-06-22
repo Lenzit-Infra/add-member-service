@@ -6,7 +6,9 @@ from fastapi import HTTPException
 from app.models.user import User
 from app.core import security, config
 from app.core.email_utils import send_email
+from app.core.permissions import ROLES, PERMISSION_CATALOG, DEFAULT_ROLE_PERMISSIONS
 from app.repositories.settings_repo import SettingsRepository
+from app.services import audit
 
 
 class AccountService:
@@ -24,7 +26,7 @@ class AccountService:
 
     # --- Login ---
 
-    def authenticate(self, username_or_email: str, password: str) -> User:
+    def authenticate(self, username_or_email: str, password: str, client_ip: str = None) -> User:
         identifier = username_or_email.strip().lower()
         user = self.db.query(User).filter(
             or_(User.username == identifier, User.email == identifier)
@@ -54,6 +56,7 @@ class AccountService:
         user.failed_attempts = 0
         user.locked_until = None
         user.last_login_at = datetime.utcnow()
+        user.last_login_ip = client_ip
         self.db.commit()
         return user
 
@@ -144,3 +147,103 @@ class AccountService:
         user.failed_attempts = 0
         user.locked_until = None
         self.db.commit()
+
+    # --- User management (admin-only, gated at the route level) ---
+
+    def _remaining_admin_count(self, excluding_user_id: int = None) -> int:
+        q = self.db.query(User).filter(User.role == "admin", User.is_active == True)
+        if excluding_user_id is not None:
+            q = q.filter(User.id != excluding_user_id)
+        return q.count()
+
+    def list_users(self) -> list:
+        return self.db.query(User).order_by(User.created_at.asc()).all()
+
+    def create_user(self, username: str, email: str, password: str, role: str, actor_username: str) -> User:
+        username = username.strip().lower()
+        email = email.strip().lower()
+        if role not in ROLES:
+            raise HTTPException(status_code=400, detail=f"Role must be one of: {', '.join(ROLES)}")
+        if len(password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        if self.db.query(User).filter(or_(User.username == username, User.email == email)).first():
+            raise HTTPException(status_code=409, detail="A user with that username or email already exists")
+
+        user = User(username=username, email=email, password_hash=security.hash_password(password), role=role)
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        audit.log_action(self.db, actor_username, "user.create", f"user:{username}", f"role={role}")
+        return user
+
+    def update_user(self, user_id: int, actor: User, role: str = None, is_active: bool = None, new_password: str = None) -> User:
+        target = self.db.query(User).filter(User.id == user_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        demoting_or_disabling_last_admin = (
+            target.role == "admin"
+            and ((role is not None and role != "admin") or (is_active is False))
+            and self._remaining_admin_count(excluding_user_id=target.id) == 0
+        )
+        if demoting_or_disabling_last_admin:
+            raise HTTPException(status_code=400, detail="Can't demote or disable the last remaining admin")
+
+        if role is not None:
+            if role not in ROLES:
+                raise HTTPException(status_code=400, detail=f"Role must be one of: {', '.join(ROLES)}")
+            if role != target.role:
+                audit.log_action(self.db, actor.username, "user.role_change", f"user:{target.username}", f"{target.role} -> {role}")
+            target.role = role
+
+        if is_active is not None and is_active != target.is_active:
+            target.is_active = is_active
+            audit.log_action(self.db, actor.username, "user.activation_change", f"user:{target.username}", f"is_active={is_active}")
+
+        if new_password is not None:
+            if len(new_password) < 8:
+                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+            target.password_hash = security.hash_password(new_password)
+            target.token_version += 1
+            target.failed_attempts = 0
+            target.locked_until = None
+            audit.log_action(self.db, actor.username, "user.password_reset", f"user:{target.username}")
+
+        self.db.commit()
+        self.db.refresh(target)
+        return target
+
+    def delete_user(self, user_id: int, actor: User):
+        target = self.db.query(User).filter(User.id == user_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target.id == actor.id:
+            raise HTTPException(status_code=400, detail="You can't delete your own account")
+        if target.role == "admin" and self._remaining_admin_count(excluding_user_id=target.id) == 0:
+            raise HTTPException(status_code=400, detail="Can't delete the last remaining admin")
+
+        username = target.username
+        self.db.delete(target)
+        self.db.commit()
+        audit.log_action(self.db, actor.username, "user.delete", f"user:{username}")
+
+    # --- Roles & permissions ---
+
+    def list_roles(self) -> dict:
+        roles = {}
+        for role in ROLES:
+            if role == "admin":
+                roles[role] = {"permissions": [p["key"] for p in PERMISSION_CATALOG], "fixed": True}
+            else:
+                roles[role] = {"permissions": sorted(self.settings.get_role_permissions(role)), "fixed": False}
+        return {"catalog": PERMISSION_CATALOG, "roles": roles}
+
+    def set_role_permissions(self, role: str, permissions: list, actor_username: str) -> set:
+        if role == "admin":
+            raise HTTPException(status_code=400, detail="The admin role's permissions are fixed and can't be edited")
+        try:
+            updated = self.settings.set_role_permissions(role, permissions)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        audit.log_action(self.db, actor_username, "role.permissions_update", f"role:{role}", ",".join(sorted(updated)))
+        return updated

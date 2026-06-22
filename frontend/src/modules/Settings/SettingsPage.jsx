@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { settingsApi } from './api';
 import IconSVG from '../../components/IconSVG';
+import UsersRolesPanel from './UsersRolesPanel';
+import AuditLogPanel from './AuditLogPanel';
 
 const ADMIN_ACCESS_TAB = 'Admin Access';
+const USERS_ROLES_TAB = 'Users & Roles';
+const AUDIT_LOG_TAB = 'Audit Log';
 
 const SettingsPage = () => {
     const [schema, setSchema] = useState([]);
@@ -34,7 +38,7 @@ const SettingsPage = () => {
     const categories = useMemo(() => {
         const seen = [];
         schema.forEach(s => { if (!seen.includes(s.category)) seen.push(s.category); });
-        seen.push(ADMIN_ACCESS_TAB);
+        seen.push(ADMIN_ACCESS_TAB, USERS_ROLES_TAB, AUDIT_LOG_TAB);
         return seen;
     }, [schema]);
 
@@ -102,7 +106,11 @@ const SettingsPage = () => {
                 </div>
             )}
 
-            {activeTab === ADMIN_ACCESS_TAB ? (
+            {activeTab === USERS_ROLES_TAB ? (
+                <UsersRolesPanel />
+            ) : activeTab === AUDIT_LOG_TAB ? (
+                <AuditLogPanel />
+            ) : activeTab === ADMIN_ACCESS_TAB ? (
                 <div className="settings-card" style={{ maxWidth: 520 }}>
                     <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>
                         Anyone on this list can claim a dashboard admin account at <code>/?view=claim-admin</code>.
