@@ -100,3 +100,77 @@ def test_count_eligible_agents(db_session):
     _make_agent(db_session, "+1013", 1013)
 
     assert agent_selector.count_eligible_agents(db_session, DAILY_LIMIT) == 2
+
+
+# --- Warm-up ramp (new agents get a lower daily cap that ramps up over time) ---
+
+NEW_AGENT_LIMIT = 5
+STEADY_LIMIT = 30
+WARMUP_DAYS = 10
+
+
+def test_daily_limit_for_brand_new_agent_is_the_new_agent_limit(db_session):
+    agent = _make_agent(db_session, "+2000", 2000)
+    agent.first_joined_at = datetime.utcnow()
+    limit = agent_selector.daily_limit_for(agent, NEW_AGENT_LIMIT, STEADY_LIMIT, WARMUP_DAYS)
+    assert limit == NEW_AGENT_LIMIT
+
+
+def test_daily_limit_for_ramps_linearly_midway_through_warmup(db_session):
+    agent = _make_agent(db_session, "+2001", 2001)
+    agent.first_joined_at = datetime.utcnow() - timedelta(days=WARMUP_DAYS / 2)
+    limit = agent_selector.daily_limit_for(agent, NEW_AGENT_LIMIT, STEADY_LIMIT, WARMUP_DAYS)
+    expected = round(NEW_AGENT_LIMIT + (STEADY_LIMIT - NEW_AGENT_LIMIT) * 0.5)
+    assert limit == expected
+
+
+def test_daily_limit_for_returns_steady_limit_after_warmup_ends(db_session):
+    agent = _make_agent(db_session, "+2002", 2002)
+    agent.first_joined_at = datetime.utcnow() - timedelta(days=WARMUP_DAYS + 5)
+    limit = agent_selector.daily_limit_for(agent, NEW_AGENT_LIMIT, STEADY_LIMIT, WARMUP_DAYS)
+    assert limit == STEADY_LIMIT
+
+
+def test_daily_limit_for_no_ramp_when_warmup_days_is_zero(db_session):
+    agent = _make_agent(db_session, "+2003", 2003)
+    agent.first_joined_at = datetime.utcnow()
+    limit = agent_selector.daily_limit_for(agent, NEW_AGENT_LIMIT, STEADY_LIMIT, 0)
+    assert limit == STEADY_LIMIT
+
+
+def test_select_best_agent_excludes_new_agent_once_it_hits_its_warmup_cap(db_session):
+    brand_new = _make_agent(db_session, "+2004", 2004)
+    brand_new.first_joined_at = datetime.utcnow()
+    db_session.commit()
+    _log_successes(db_session, brand_new.id, NEW_AGENT_LIMIT)  # exactly at its warm-up cap
+
+    chosen = agent_selector.select_best_agent(
+        db_session, STEADY_LIMIT, new_agent_daily_limit=NEW_AGENT_LIMIT, warmup_days=WARMUP_DAYS
+    )
+    assert chosen is None  # would NOT be excluded under the flat steady-state limit alone
+
+
+def test_select_best_agent_still_uses_warmed_up_agent_under_its_higher_cap(db_session):
+    veteran = _make_agent(db_session, "+2005", 2005)
+    veteran.first_joined_at = datetime.utcnow() - timedelta(days=WARMUP_DAYS + 1)
+    db_session.commit()
+    _log_successes(db_session, veteran.id, NEW_AGENT_LIMIT)  # past the new-agent cap, fine for a veteran
+
+    chosen = agent_selector.select_best_agent(
+        db_session, STEADY_LIMIT, new_agent_daily_limit=NEW_AGENT_LIMIT, warmup_days=WARMUP_DAYS
+    )
+    assert chosen.id == veteran.id
+
+
+def test_agent_status_info_respects_needs_review_ratio_param(db_session):
+    agent = _make_agent(db_session, "+2006", 2006)
+    for _ in range(7):
+        db_session.add(OperationLog(agent_id=agent.id, status=OperationStatus.FAILED_OTHER))
+    for _ in range(3):
+        db_session.add(OperationLog(agent_id=agent.id, status=OperationStatus.SUCCESS))
+    db_session.commit()  # 7/10 = 0.7 failure ratio
+
+    lenient = agent_selector.agent_status_info(db_session, agent, DAILY_LIMIT, needs_review_ratio=0.95)
+    strict = agent_selector.agent_status_info(db_session, agent, DAILY_LIMIT, needs_review_ratio=0.5)
+    assert lenient["needs_review"] is False
+    assert strict["needs_review"] is True

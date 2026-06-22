@@ -20,6 +20,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Deploys are off by default. To turn them on:
+    #   Repo Settings -> Secrets and variables -> Actions -> Variables -> New
+    #   repository variable: DEPLOY_ENABLED = true
+    # With that set, a push to main only deploys if the commit message
+    # contains "[deploy]". Manual runs from the Actions tab (workflow_dispatch)
+    # always work regardless of either gate.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true' && contains(github.event.head_commit.message, '[deploy]'))
     steps:
       - uses: actions/checkout@v4
 

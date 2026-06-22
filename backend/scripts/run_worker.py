@@ -9,15 +9,26 @@ import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.worker_service import WorkerService
 from app.services.movement_monitor_service import MovementMonitorService
-from app.core.database import Base, engine
+from app.core.database import Base, engine, SessionLocal
 from app.core.migrations import run_lightweight_migrations
+from app.repositories.settings_repo import SettingsRepository
 # Import all models to ensure tables are created
-from app.models import agent, group, member, order, logs, user
+from app.models import agent, group, member, order, logs, user, settings
 import time
 
 # Ensure all database tables are created + apply lightweight migrations
 Base.metadata.create_all(bind=engine)
 run_lightweight_migrations(engine)
+
+# Read scheduler intervals once at startup (Settings → Worker & Throughput).
+# Changing these in the dashboard requires restarting this process to take
+# effect — APScheduler jobs are scheduled once below, not re-read per tick.
+_settings_db = SessionLocal()
+_settings_repo = SettingsRepository(_settings_db)
+_settings_repo.initialize_defaults()
+WORKER_CHECK_INTERVAL_SECONDS = int(_settings_repo.get_setting("worker_check_interval", "10"))
+MOVEMENT_MONITOR_INTERVAL_MINUTES = int(_settings_repo.get_setting("movement_monitor_interval_minutes", "5"))
+_settings_db.close()
 
 async def start_scheduler():
     """Sets up the scheduler and runs the main loop asynchronously."""
@@ -30,21 +41,20 @@ async def start_scheduler():
     # 1. Setup APScheduler
     scheduler = AsyncIOScheduler()
 
-    # 2. Add the job: Run the check every 10 seconds
-    # FIX: Changed interval from minutes=1 to seconds=10
+    # 2. Add the job: Run the order-processing check
     scheduler.add_job(
         worker.run_periodic_check,
         'interval',
-        seconds=10,
+        seconds=WORKER_CHECK_INTERVAL_SECONDS,
         id='order_processor'
     )
 
-    # 2b. Phase 4: Member Movement Monitor — runs less frequently (every 5 minutes)
+    # 2b. Phase 4: Member Movement Monitor — runs less frequently by default
     # to avoid competing with the adder/scraper for agent flood limits.
     scheduler.add_job(
         movement_monitor.run_check,
         'interval',
-        minutes=5,
+        minutes=MOVEMENT_MONITOR_INTERVAL_MINUTES,
         id='movement_monitor'
     )
 
@@ -52,9 +62,8 @@ async def start_scheduler():
     scheduler.start()
 
     print("Scheduler initialized. Press Ctrl+C to exit.")
-    # FIX: Updated message to reflect the new 10-second interval
-    print("Worker is now checking for active orders every 10 seconds.")
-    print("Member Movement Monitor is checking target groups every 5 minutes.")
+    print(f"Worker is now checking for active orders every {WORKER_CHECK_INTERVAL_SECONDS} seconds.")
+    print(f"Member Movement Monitor is checking target groups every {MOVEMENT_MONITOR_INTERVAL_MINUTES} minutes.")
     
     # 4. Keep the asyncio loop running indefinitely
     try:

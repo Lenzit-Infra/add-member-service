@@ -1,10 +1,16 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.core.database import get_db
+from app.core.settings_schema import SETTINGS_SCHEMA
 from app.repositories.analytics_repo import AnalyticsRepository
 from app.repositories.settings_repo import SettingsRepository
 from .schemas import SettingUpdate
+
+
+class AdminEmailRequest(BaseModel):
+    email: EmailStr
 
 router = APIRouter()
 
@@ -41,13 +47,38 @@ def get_capacity(db: Session = Depends(get_db)):
 
 @router.get("/settings")
 def get_settings(db: Session = Depends(get_db)):
+    """Every tunable, enriched with its category/label/description so the
+    Settings page can group and render without duplicating that metadata."""
     repo = SettingsRepository(db)
     repo.initialize_defaults()
-    keys = ["batch_size", "sleep_delay_min", "sleep_delay_max", "daily_limit_per_agent", "worker_check_interval"]
-    return {k: repo.get_setting(k) for k in keys}
+    return [
+        {**schema_entry, "value": repo.get_setting(schema_entry["key"], str(schema_entry["default"]))}
+        for schema_entry in SETTINGS_SCHEMA
+    ]
 
 @router.post("/settings")
 def update_setting(data: SettingUpdate, db: Session = Depends(get_db)):
     repo = SettingsRepository(db)
     repo.set_setting(data.key, data.value)
     return {"status": "success", "key": data.key, "value": data.value}
+
+@router.get("/admin-emails")
+def get_admin_emails(db: Session = Depends(get_db)):
+    repo = SettingsRepository(db)
+    repo.initialize_defaults()
+    return {"emails": repo.get_admin_emails()}
+
+@router.post("/admin-emails")
+def add_admin_email(data: AdminEmailRequest, db: Session = Depends(get_db)):
+    repo = SettingsRepository(db)
+    repo.initialize_defaults()
+    return {"emails": repo.add_admin_email(data.email)}
+
+@router.delete("/admin-emails/{email}")
+def remove_admin_email(email: str, db: Session = Depends(get_db)):
+    repo = SettingsRepository(db)
+    repo.initialize_defaults()
+    try:
+        return {"emails": repo.remove_admin_email(email)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

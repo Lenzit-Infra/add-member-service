@@ -16,6 +16,8 @@ def _get_agent_or_404(agent_id: int, db: Session) -> Agent:
 def toggle_active(agent_id: int, db: Session = Depends(get_db)):
     agent = _get_agent_or_404(agent_id, db)
     agent.is_active = not agent.is_active
+    if agent.is_active:
+        agent.pause_reason = None  # manual re-activation clears any auto-pause note
     db.commit()
     return {"status": "success", "id": agent.id, "is_active": agent.is_active}
 

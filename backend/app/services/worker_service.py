@@ -1,6 +1,5 @@
 # app/services/worker_service.py
 import asyncio
-import random
 from datetime import datetime, timedelta
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -10,7 +9,8 @@ from app.modules.scraper.service import ScraperService
 from app.modules.adder.service import AdderService
 from app.models.order import Order, OrderStatus
 from app.repositories.scraper_repo import ScraperRepository
-from app.repositories.settings_repo import SettingsRepository # NEW IMPORT
+from app.repositories.settings_repo import SettingsRepository
+from app.services import agent_selector
 
 class WorkerService:
     def __init__(self):
@@ -27,12 +27,16 @@ class WorkerService:
         sleep_min = int(self.settings_repo.get_setting("sleep_delay_min", "10"))
         sleep_max = int(self.settings_repo.get_setting("sleep_delay_max", "30"))
         daily_limit = int(self.settings_repo.get_setting("daily_limit_per_agent", "30"))
+        new_agent_limit = int(self.settings_repo.get_setting("new_agent_daily_limit", "5"))
+        warmup_days = int(self.settings_repo.get_setting("new_agent_warmup_days", "14"))
+        auto_pause_ratio = float(self.settings_repo.get_setting("auto_pause_failure_ratio", "0.9"))
 
         print(f"WORKER: Processing Order {order.id} with Batch Size: {batch_size}")
 
         # 1. Select Agent and Initialize Client (anti-ban-aware: load-balanced,
-        # skips agents at today's capacity or in flood-wait cooldown)
-        agent_record = self.order_repo.get_available_agent(daily_limit)
+        # skips agents at today's capacity or in flood-wait cooldown, and caps
+        # newer agents at a lower daily limit during their warm-up period)
+        agent_record = self.order_repo.get_available_agent(daily_limit, new_agent_limit, warmup_days)
         if not agent_record:
             print("WORKER: No eligible agents available (all busy, at capacity, in cooldown, or banned).")
             return
@@ -68,7 +72,9 @@ class WorkerService:
                 target_group_link=order.target_group.invite_link,
                 agent_id=agent_record.id,
                 target_group_id=order.target_group.id,
-                count=batch_size  # USING DYNAMIC SETTING
+                count=batch_size,  # USING DYNAMIC SETTING
+                sleep_min=sleep_min,
+                sleep_max=sleep_max,
             )
             successful_adds = adder_result["success_count"]
 
@@ -81,13 +87,17 @@ class WorkerService:
 
             is_completed = self.order_repo.increment_order_count(order.id, successful_adds)
 
-            # 4. Dynamic Sleep
-            # Only sleep if we actually added someone to allow cool-down
-            if successful_adds > 0:
-                delay = random.randint(sleep_min, sleep_max)
-                print(f"WORKER: Cooling down for {delay} seconds (Configured Range: {sleep_min}-{sleep_max})...")
-                await asyncio.sleep(delay)
-                 
+            # 4. Circuit breaker: if this agent's recent attempts are mostly
+            # failing, auto-pause it (is_active=False) instead of letting the
+            # worker keep hammering a likely-restricted account. A human has
+            # to look at it and re-activate it from the Agents page.
+            failure_ratio = agent_selector.get_recent_failure_ratio(self.db, agent_record.id)
+            if failure_ratio >= auto_pause_ratio and agent_record.is_active:
+                agent_record.is_active = False
+                agent_record.pause_reason = f"Auto-paused: {failure_ratio:.0%} of recent attempts failed"
+                self.db.commit()
+                print(f"WORKER: Auto-paused agent {agent_record.phone} — {agent_record.pause_reason}")
+
         except Exception as e:
             print(f"WORKER ERROR: {e}")
         finally:

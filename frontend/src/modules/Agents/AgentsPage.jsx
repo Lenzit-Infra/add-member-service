@@ -69,7 +69,7 @@ const AgentsPage = () => {
                             <td>{a.id}</td>
                             <td>{a.phone}</td>
                             <td>
-                                <span className={`badge badge-${STATE_BADGE[a.state] || 'inactive'}`}>
+                                <span className={`badge badge-${STATE_BADGE[a.state] || 'inactive'}`} title={a.pause_reason || ''}>
                                     {STATE_LABEL[a.state] || a.state}
                                 </span>
                             </td>

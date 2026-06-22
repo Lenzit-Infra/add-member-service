@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core import security, config
 from app.models.user import User
+from app.repositories.settings_repo import SettingsRepository
 from .schemas import LoginRequest, ClaimAdminRequest, ClaimAdminComplete, ForgotPasswordRequest, ResetPasswordRequest
 from .service import AccountService
 from .dependencies import get_current_user
@@ -14,8 +15,9 @@ REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/v1/account"
 
 
-def _set_refresh_cookie(response: Response, user: User):
-    token = security.create_refresh_token(user.id, user.token_version)
+def _set_refresh_cookie(response: Response, user: User, db: Session):
+    days = int(SettingsRepository(db).get_setting("refresh_token_expire_days", str(config.REFRESH_TOKEN_EXPIRE_DAYS)))
+    token = security.create_refresh_token(user.id, user.token_version, expire_days=days)
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=token,
@@ -24,8 +26,13 @@ def _set_refresh_cookie(response: Response, user: User):
         samesite="lax",
         domain=config.COOKIE_DOMAIN,
         path=REFRESH_COOKIE_PATH,
-        max_age=config.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        max_age=days * 86400,
     )
+
+
+def _create_access_token(user: User, db: Session) -> str:
+    minutes = int(SettingsRepository(db).get_setting("access_token_expire_minutes", str(config.ACCESS_TOKEN_EXPIRE_MINUTES)))
+    return security.create_access_token(user.id, expire_minutes=minutes)
 
 
 def _user_public(user: User) -> dict:
@@ -36,8 +43,8 @@ def _user_public(user: User) -> dict:
 def login(data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     service = AccountService(db)
     user = service.authenticate(data.username_or_email, data.password)
-    _set_refresh_cookie(response, user)
-    return {"access_token": security.create_access_token(user.id), "user": _user_public(user)}
+    _set_refresh_cookie(response, user, db)
+    return {"access_token": _create_access_token(user, db), "user": _user_public(user)}
 
 
 @router.post("/refresh")
@@ -54,8 +61,8 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
     if not user or not user.is_active or user.token_version != payload["tv"]:
         raise HTTPException(status_code=401, detail="Session expired, please log in again")
 
-    _set_refresh_cookie(response, user)  # rotate
-    return {"access_token": security.create_access_token(user.id), "user": _user_public(user)}
+    _set_refresh_cookie(response, user, db)  # rotate
+    return {"access_token": _create_access_token(user, db), "user": _user_public(user)}
 
 
 @router.post("/logout")
@@ -79,8 +86,8 @@ def claim_admin_request(data: ClaimAdminRequest, db: Session = Depends(get_db)):
 def claim_admin_complete(data: ClaimAdminComplete, response: Response, db: Session = Depends(get_db)):
     service = AccountService(db)
     user = service.complete_claim(data.token, data.username, data.password)
-    _set_refresh_cookie(response, user)
-    return {"access_token": security.create_access_token(user.id), "user": _user_public(user)}
+    _set_refresh_cookie(response, user, db)
+    return {"access_token": _create_access_token(user, db), "user": _user_public(user)}
 
 
 @router.post("/forgot-password")

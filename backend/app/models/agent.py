@@ -23,6 +23,10 @@ class Agent(Base):
     # Anti-ban: set when Telegram raises FloodWaitError; the agent selector
     # skips this agent until cooldown_until passes.
     cooldown_until = Column(DateTime, nullable=True)
+
+    # Set when the worker auto-pauses this agent (is_active=False) after its
+    # recent failure ratio crosses the configured auto-pause threshold.
+    pause_reason = Column(String, nullable=True)
     
     # Timing & Durations
     first_joined_at = Column(DateTime, default=datetime.utcnow)

@@ -6,14 +6,21 @@ from fastapi import HTTPException
 from app.models.user import User
 from app.core import security, config
 from app.core.email_utils import send_email
-
-MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_MINUTES = 15
+from app.repositories.settings_repo import SettingsRepository
 
 
 class AccountService:
     def __init__(self, db: Session):
         self.db = db
+        self.settings = SettingsRepository(db)
+        # Self-healing: guarantees admin_emails (and every other tunable)
+        # exists before it's read, regardless of whether anyone has opened
+        # the Settings page yet — this is the very first thing a fresh
+        # deployment needs to work.
+        self.settings.initialize_defaults()
+
+    def _setting_int(self, key: str, default: int) -> int:
+        return int(self.settings.get_setting(key, str(default)))
 
     # --- Login ---
 
@@ -33,10 +40,13 @@ class AccountService:
         if not user.is_active:
             raise HTTPException(status_code=403, detail="Account disabled")
 
+        max_failed = self._setting_int("login_max_failed_attempts", 5)
+        lockout_minutes = self._setting_int("login_lockout_minutes", 15)
+
         if not security.verify_password(password, user.password_hash):
             user.failed_attempts = (user.failed_attempts or 0) + 1
-            if user.failed_attempts >= MAX_FAILED_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            if user.failed_attempts >= max_failed:
+                user.locked_until = datetime.utcnow() + timedelta(minutes=lockout_minutes)
                 user.failed_attempts = 0
             self.db.commit()
             raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -51,11 +61,12 @@ class AccountService:
 
     def request_claim(self, email: str):
         email = email.strip().lower()
-        eligible = email in config.ADMIN_EMAILS
+        eligible = email in self.settings.get_admin_emails()
         already_claimed = self.db.query(User).filter(User.email == email).first() is not None
 
         if eligible and not already_claimed:
-            token = security.create_claim_token(email)
+            expire_minutes = self._setting_int("claim_token_expire_minutes", 30)
+            token = security.create_claim_token(email, expire_minutes)
             # Query-param routing (not a path) so this works on static hosting
             # (GitHub Pages) with zero server-side route configuration.
             link = f"{config.FRONTEND_URL}/?view=claim-admin&token={token}"
@@ -63,7 +74,7 @@ class AccountService:
                 email,
                 "Claim your Lenzit dashboard admin account",
                 f"<p>Click below to finish setting up your admin account:</p><p><a href='{link}'>{link}</a></p>"
-                f"<p>This link expires in {config.CLAIM_TOKEN_EXPIRE_MINUTES} minutes.</p>",
+                f"<p>This link expires in {expire_minutes} minutes.</p>",
             )
         # Always the same response — don't leak which emails are valid admin emails.
 
@@ -73,7 +84,7 @@ class AccountService:
             raise HTTPException(status_code=400, detail="Invalid or expired claim link")
 
         email = payload["email"]
-        if email not in config.ADMIN_EMAILS:
+        if email not in self.settings.get_admin_emails():
             raise HTTPException(status_code=403, detail="This email is no longer eligible")
 
         if self.db.query(User).filter(User.email == email).first():
@@ -104,13 +115,14 @@ class AccountService:
         user = self.db.query(User).filter(User.email == email).first()
 
         if user:
-            token = security.create_reset_token(user.id, user.token_version)
+            expire_minutes = self._setting_int("reset_token_expire_minutes", 30)
+            token = security.create_reset_token(user.id, user.token_version, expire_minutes)
             link = f"{config.FRONTEND_URL}/?view=reset-password&token={token}"
             send_email(
                 email,
                 "Reset your Lenzit dashboard password",
                 f"<p>Click below to reset your password:</p><p><a href='{link}'>{link}</a></p>"
-                f"<p>This link expires in {config.RESET_TOKEN_EXPIRE_MINUTES} minutes. "
+                f"<p>This link expires in {expire_minutes} minutes. "
                 f"If you didn't request this, you can ignore this email.</p>",
             )
         # Always the same response — don't leak which emails have accounts.

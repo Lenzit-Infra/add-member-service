@@ -93,19 +93,25 @@ class AnalyticsRepository:
     def get_agent_performance_summary(self) -> List[Dict[str, Any]]:
         """Per-agent stats + live Telegram-capacity status (answers 'what's
         this agent's status, and when does its capacity free up?')."""
-        daily_limit = int(SettingsRepository(self.db).get_setting("daily_limit_per_agent", "30"))
+        settings = SettingsRepository(self.db)
+        steady_limit = int(settings.get_setting("daily_limit_per_agent", "30"))
+        new_agent_limit = int(settings.get_setting("new_agent_daily_limit", "5"))
+        warmup_days = int(settings.get_setting("new_agent_warmup_days", "14"))
+        needs_review_ratio = float(settings.get_setting("needs_review_failure_ratio", "0.7"))
         agents = self.db.query(Agent).all()
         today_counts = agent_selector.get_today_counts(self.db)
 
         result = []
         for agent in agents:
-            capacity = agent_selector.agent_status_info(self.db, agent, daily_limit, today_counts)
+            effective_limit = agent_selector.daily_limit_for(agent, new_agent_limit, steady_limit, warmup_days)
+            capacity = agent_selector.agent_status_info(self.db, agent, effective_limit, today_counts, needs_review_ratio)
             result.append({
                 "id": agent.id,
                 "phone": agent.phone,
                 "is_active": agent.is_active,
                 "is_banned": agent.is_banned,
                 "ban_reason": agent.ban_reason,
+                "pause_reason": agent.pause_reason,
                 "first_joined_at": agent.first_joined_at.strftime("%Y-%m-%d") if agent.first_joined_at else "-",
                 "last_active_at": agent.last_active_at.strftime("%Y-%m-%d %H:%M") if agent.last_active_at else "-",
                 "total_active_seconds": agent.total_active_seconds,
@@ -145,8 +151,11 @@ class AnalyticsRepository:
     def get_capacity_planning(self) -> Dict[str, Any]:
         """Answers: what's each active order's status/blocker/ETA, and how many
         agents would it take to clear the whole backlog at today's pace?"""
-        daily_limit = int(SettingsRepository(self.db).get_setting("daily_limit_per_agent", "30"))
-        eligible_agent_count = agent_selector.count_eligible_agents(self.db, daily_limit)
+        settings = SettingsRepository(self.db)
+        daily_limit = int(settings.get_setting("daily_limit_per_agent", "30"))
+        new_agent_limit = int(settings.get_setting("new_agent_daily_limit", "5"))
+        warmup_days = int(settings.get_setting("new_agent_warmup_days", "14"))
+        eligible_agent_count = agent_selector.count_eligible_agents(self.db, daily_limit, new_agent_limit, warmup_days)
         total_agents = self.db.query(Agent).count()
         banned_count = self.db.query(Agent).filter(Agent.is_banned == True).count()
 

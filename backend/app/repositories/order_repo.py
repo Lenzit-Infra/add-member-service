@@ -42,8 +42,8 @@ class OrderRepository:
             return order.status == OrderStatus.FINISHED
         return False
 
-    def get_available_agent(self, daily_limit: int = 30) -> Optional[Agent]:
+    def get_available_agent(self, daily_limit: int = 30, new_agent_daily_limit: Optional[int] = None, warmup_days: int = 0) -> Optional[Agent]:
         """Anti-ban-aware selection: active, not banned, not in flood-wait
-        cooldown, under today's daily limit, least-used-today first.
+        cooldown, under today's (age-aware) daily limit, least-used-today first.
         See app.services.agent_selector for the actual rule."""
-        return agent_selector.select_best_agent(self.db, daily_limit)
+        return agent_selector.select_best_agent(self.db, daily_limit, new_agent_daily_limit, warmup_days)

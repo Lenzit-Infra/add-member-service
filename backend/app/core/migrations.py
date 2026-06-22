@@ -12,6 +12,7 @@ from sqlalchemy.engine import Engine
 # (table, column, ddl_type)
 NEW_COLUMNS = [
     ("agents", "cooldown_until", "DATETIME"),
+    ("agents", "pause_reason", "TEXT"),
 ]
 
 

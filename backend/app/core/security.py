@@ -28,45 +28,49 @@ def _decode(token: str) -> Optional[dict]:
         return None
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, expire_minutes: Optional[int] = None) -> str:
+    minutes = expire_minutes if expire_minutes is not None else config.ACCESS_TOKEN_EXPIRE_MINUTES
     now = datetime.now(timezone.utc)
     return _encode({
         "sub": str(user_id),  # PyJWT requires "sub" to be a string
         "type": "access",
         "iat": now,
-        "exp": now + timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": now + timedelta(minutes=minutes),
     })
 
 
-def create_refresh_token(user_id: int, token_version: int) -> str:
+def create_refresh_token(user_id: int, token_version: int, expire_days: Optional[int] = None) -> str:
+    days = expire_days if expire_days is not None else config.REFRESH_TOKEN_EXPIRE_DAYS
     now = datetime.now(timezone.utc)
     return _encode({
         "sub": str(user_id),
         "type": "refresh",
         "tv": token_version,
         "iat": now,
-        "exp": now + timedelta(days=config.REFRESH_TOKEN_EXPIRE_DAYS),
+        "exp": now + timedelta(days=days),
     })
 
 
-def create_claim_token(email: str) -> str:
+def create_claim_token(email: str, expire_minutes: Optional[int] = None) -> str:
+    minutes = expire_minutes if expire_minutes is not None else config.CLAIM_TOKEN_EXPIRE_MINUTES
     now = datetime.now(timezone.utc)
     return _encode({
         "email": email.lower(),
         "type": "claim",
         "iat": now,
-        "exp": now + timedelta(minutes=config.CLAIM_TOKEN_EXPIRE_MINUTES),
+        "exp": now + timedelta(minutes=minutes),
     })
 
 
-def create_reset_token(user_id: int, token_version: int) -> str:
+def create_reset_token(user_id: int, token_version: int, expire_minutes: Optional[int] = None) -> str:
+    minutes = expire_minutes if expire_minutes is not None else config.RESET_TOKEN_EXPIRE_MINUTES
     now = datetime.now(timezone.utc)
     return _encode({
         "sub": str(user_id),
         "type": "reset",
         "tv": token_version,
         "iat": now,
-        "exp": now + timedelta(minutes=config.RESET_TOKEN_EXPIRE_MINUTES),
+        "exp": now + timedelta(minutes=minutes),
     })
 
 
