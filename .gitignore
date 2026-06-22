@@ -38,6 +38,9 @@ ENV/
 *.db
 *.db-journal
 
+# Runtime logs (rotating files written by app.core.logging_config)
+backend/logs/
+
 # Jupyter Notebooks (If you use them for testing)
 .ipynb_checkpoints
 

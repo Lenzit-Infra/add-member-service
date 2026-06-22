@@ -1,11 +1,11 @@
-name: Deploy frontend to GitHub Pages
+name: Publish frontend to lenzit.ir
 
 on:
   push:
     branches: [main]
     paths:
       - 'frontend/**'
-      - '.github/workflows/deploy-frontend.yml'
+      - '.github/workflows/publish.yml'
   workflow_dispatch:
 
 permissions:

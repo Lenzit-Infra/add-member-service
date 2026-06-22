@@ -1,3 +1,6 @@
+from app.core.logging_config import setup_logging
+setup_logging("api")  # backend/logs/api.log — must run before anything else logs/prints
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import Base, engine

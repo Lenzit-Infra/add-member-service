@@ -5,6 +5,9 @@ import os
 # regardless of the caller's working directory.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.core.logging_config import setup_logging
+setup_logging("worker")  # backend/logs/worker.log — must run before anything else logs/prints
+
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.worker_service import WorkerService

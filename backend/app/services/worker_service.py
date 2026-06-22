@@ -1,5 +1,6 @@
 # app/services/worker_service.py
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -11,6 +12,8 @@ from app.models.order import Order, OrderStatus
 from app.repositories.scraper_repo import ScraperRepository
 from app.repositories.settings_repo import SettingsRepository
 from app.services import agent_selector
+
+logger = logging.getLogger("worker")
 
 class WorkerService:
     def __init__(self):
@@ -98,8 +101,8 @@ class WorkerService:
                 self.db.commit()
                 print(f"WORKER: Auto-paused agent {agent_record.phone} — {agent_record.pause_reason}")
 
-        except Exception as e:
-            print(f"WORKER ERROR: {e}")
+        except Exception:
+            logger.exception(f"WORKER ERROR processing order {order.id} with agent {agent_record.phone}")
         finally:
             if client.is_connected():
                 await client.disconnect()
@@ -118,6 +121,6 @@ class WorkerService:
                 pass # Silent when no order to reduce log noise
             
             self.db.commit()
-        except Exception as e:
-            print(f"SCHEDULER ERROR: {e}")
+        except Exception:
+            logger.exception("SCHEDULER ERROR in run_periodic_check")
             self.db.rollback()
