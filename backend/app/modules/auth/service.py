@@ -2,13 +2,14 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from sqlalchemy.orm import Session
 from app.models.agent import Agent
+from app.core.telegram_proxy import get_proxy
 
 # Global state for pending logins (In-memory)
 PENDING_LOGIN_CLIENTS = {}
 
 class AuthService:
     async def initiate_login(self, phone: str, api_id: str, api_hash: str):
-        client = TelegramClient(StringSession(), api_id, api_hash)
+        client = TelegramClient(StringSession(), api_id, api_hash, proxy=get_proxy())
         await client.connect()
         
         if not await client.is_user_authorized():

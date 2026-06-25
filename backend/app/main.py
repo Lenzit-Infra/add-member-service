@@ -14,6 +14,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.orders.router import router as orders_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.agents.router import router as agents_router
+from app.modules.health.router import router as health_router
 
 # Initialize DB Tables + apply lightweight migrations (new columns on pre-existing tables)
 Base.metadata.create_all(bind=engine)
@@ -33,6 +34,8 @@ app.add_middleware(
 # Register Modules
 # /account is the public dashboard-login surface (login/refresh/claim-admin/forgot-password).
 app.include_router(account_router, prefix="/api/v1/account", tags=["Account"])
+# /health is public too — the dashboard's status indicator needs to work even before login.
+app.include_router(health_router, prefix="/api/v1", tags=["Health"])
 
 # Everything below requires a logged-in dashboard user — including Telegram-agent
 # onboarding (/auth), since adding an agent is itself an admin action.

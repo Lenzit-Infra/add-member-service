@@ -41,6 +41,9 @@ ENV/
 # Runtime logs (rotating files written by app.core.logging_config)
 backend/logs/
 
+# Generated from .env's TELEGRAM_PROXIES — contains real proxy server credentials
+backend/xray-config.json
+
 # Jupyter Notebooks (If you use them for testing)
 .ipynb_checkpoints
 

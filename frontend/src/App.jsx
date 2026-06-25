@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './App.css';
 import IconSVG from './components/IconSVG';
+import BackendStatus from './components/BackendStatus';
 
 // Import Pages from Modules
 import DashboardPage from './modules/Dashboard/DashboardPage';
@@ -59,7 +60,10 @@ const DashboardShell = () => {
                 </button>
             </div>
             <div style={{flex:1, height:'100vh', overflow:'hidden', display:'flex', flexDirection:'column'}}>
-                <div className="header"><div className="page-title">{activePage}</div></div>
+                <div className="header">
+                    <div className="page-title">{activePage}</div>
+                    <div className="header-right"><BackendStatus /></div>
+                </div>
                 <div className="main-content">{renderContent()}</div>
             </div>
         </div>

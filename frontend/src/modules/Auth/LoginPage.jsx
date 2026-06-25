@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { accountApi } from './accountApi';
 import { useAuth } from './AuthContext';
+import BackendStatus from '../../components/BackendStatus';
 
 const LoginPage = ({ onNavigate }) => {
     const { login } = useAuth();
@@ -24,6 +25,7 @@ const LoginPage = ({ onNavigate }) => {
 
     return (
         <div className="auth-page">
+            <div style={{ position: 'fixed', top: 16, right: 16 }}><BackendStatus /></div>
             <div className="auth-card">
                 <h2 className="auth-title">Lenzit Panel</h2>
                 <p className="auth-subtitle">Sign in to your dashboard account</p>

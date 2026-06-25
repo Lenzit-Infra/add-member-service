@@ -10,6 +10,7 @@ from telethon.sessions import StringSession
 # NEW IMPORTS based on modular structure
 from app.models.agent import Agent # Import the new Agent model
 from app.core.database import Base, engine, SessionLocal # Import core DB functions
+from app.core.telegram_proxy import get_proxy
 # Ensure all models are loaded for table creation
 from app.models import agent, group, member, order, logs 
 
@@ -30,7 +31,7 @@ async def add_new_account():
 
     print(f"\nConnecting to Telegram servers...")
 
-    client = TelegramClient(StringSession(), api_id, api_hash)
+    client = TelegramClient(StringSession(), api_id, api_hash, proxy=get_proxy())
     
     await client.connect()
 

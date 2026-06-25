@@ -166,6 +166,42 @@ body {
   gap: 16px;
 }
 
+.backend-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.backend-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.backend-status-checking { color: var(--text-secondary); background-color: var(--bg-body); }
+.backend-status-checking .backend-status-dot { background-color: var(--text-secondary); }
+
+.backend-status-ok { color: var(--success); background-color: var(--success-bg); }
+.backend-status-ok .backend-status-dot { background-color: var(--success); }
+
+.backend-status-degraded { color: #b45309; background-color: var(--warning-bg); }
+.backend-status-degraded .backend-status-dot { background-color: #b45309; animation: backend-status-pulse 1.5s infinite; }
+
+.backend-status-down { color: #dc2626; background-color: #fee2e2; }
+.backend-status-down .backend-status-dot { background-color: #dc2626; animation: backend-status-pulse 1.5s infinite; }
+
+@keyframes backend-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 .search-wrap {
   position: relative;
   width: 320px;

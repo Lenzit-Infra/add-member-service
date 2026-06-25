@@ -82,3 +82,21 @@ python scripts/manage_users.py reset-password myusername newpassword123
 `python scripts/manage_users.py list` shows every existing account.
 
 (The email-based "Claim admin account" flow on the login page still works too, once SMTP is configured — but it's no longer required to get in.)
+
+## 7. Telegram proxy (Xray-core)
+
+This network blocks direct outbound connections to Telegram's own servers (confirmed: repeated MTProto connection timeouts). Every Telethon connection — agent onboarding ("Add Account"), the worker's order processing — routes through a local **Xray-core** instance instead, which fans out to every vless/vmess/ss server listed in `.env`'s `TELEGRAM_PROXIES` (comma-separated) and automatically routes through whichever currently has the best live ping (Xray's built-in `leastPing` balancer — no manual switching needed).
+
+To add/remove/reorder proxy servers:
+1. Edit `TELEGRAM_PROXIES` in `backend/.env` (paste the full `vless://`, `vmess://`, or `ss://` link).
+2. Re-run `backend/scripts/start_production.ps1` (it regenerates `xray-config.json` from `.env` and restarts everything), or manually:
+   ```powershell
+   conda activate lenzit
+   cd backend
+   python scripts/generate_xray_config.py
+   ```
+   then restart `xray.exe` (kill the old process, `start_production.ps1` relaunches it with the new config).
+
+The dashboard's backend-status indicator (top-right of the header, and on the login page) shows live whether Telegram is currently reachable — if it goes red/yellow on `telegram_reachable`, check that at least one proxy link in `.env` still works.
+
+**Windows-specific gotcha**: Telethon's proxy support silently falls back to a broken code path on Windows if only `PySocks` is installed (it bypasses the proxy entirely via `asyncio`'s Windows `ProactorEventLoop`, with no error — connections just time out as if no proxy were configured). The fix is having `python-socks[asyncio]` installed too (Telethon prefers it automatically when present) — already in `requirements.txt`.

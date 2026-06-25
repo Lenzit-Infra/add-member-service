@@ -8,6 +8,7 @@ from app.models.group import Group
 from app.models.order import Order
 from app.models.member import Member
 from app.models.logs import MemberMovement
+from app.core.telegram_proxy import get_proxy
 
 
 class MovementMonitorService:
@@ -42,6 +43,7 @@ class MovementMonitorService:
                 StringSession(agent_record.session_string),
                 agent_record.api_id,
                 agent_record.api_hash,
+                proxy=get_proxy(),
             )
 
             try:

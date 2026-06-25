@@ -12,6 +12,8 @@ from app.models.order import Order, OrderStatus
 from app.repositories.scraper_repo import ScraperRepository
 from app.repositories.settings_repo import SettingsRepository
 from app.services import agent_selector
+from app.services import health
+from app.core.telegram_proxy import get_proxy
 
 logger = logging.getLogger("worker")
 
@@ -47,7 +49,8 @@ class WorkerService:
         client = TelegramClient(
             StringSession(agent_record.session_string),
             agent_record.api_id,
-            agent_record.api_hash
+            agent_record.api_hash,
+            proxy=get_proxy(),
         )
         
         try:
@@ -109,10 +112,20 @@ class WorkerService:
 
     async def run_periodic_check(self):
         try:
+            # Heartbeat for the dashboard's backend-status indicator — written every
+            # tick regardless of whether there's an active order, so "worker is alive"
+            # and "worker is processing something" stay independently observable.
+            health.record_worker_heartbeat(self.db)
+            if health.should_recheck_telegram(self.db):
+                # Blocking socket call — run off the event loop so a stalled/blocked
+                # network doesn't freeze this 10s-interval scheduler job.
+                reachable = await asyncio.to_thread(health.probe_telegram_reachable)
+                health.record_telegram_reachability(self.db, reachable)
+
             # Check dynamic interval setting (Note: Changing this only affects logic inside the loop, not the scheduler trigger itself)
-            # To make scheduler interval dynamic, we would need to restart scheduler. 
+            # To make scheduler interval dynamic, we would need to restart scheduler.
             # For now, we keep the check rapid, but we can implement logic to skip checks here if needed.
-            
+
             order = self.order_repo.get_pending_or_in_progress_order()
             if order:
                 print(f"SCHEDULER: Found active Order {order.id}.")

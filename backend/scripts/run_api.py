@@ -7,5 +7,9 @@ import uvicorn
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 if __name__ == "__main__":
-    # Port matches the hardcoded baseURL in frontend/src/api/client.js
-    uvicorn.run("app.main:app", host="0.0.0.0", port=4747, reload=True, app_dir=BACKEND_DIR)
+    # Port matches the hardcoded baseURL in frontend/src/api/client.js.
+    # reload=False deliberately — this script is the production launcher; with
+    # reload on, uvicorn spawns a separate watcher+worker process pair, and a
+    # plain Stop-Process on the parent PID leaves the actual listening process
+    # (the orphaned worker) still running the old code.
+    uvicorn.run("app.main:app", host="0.0.0.0", port=4747, reload=False, app_dir=BACKEND_DIR)
