@@ -27,9 +27,23 @@ class AuthService:
         context = PENDING_LOGIN_CLIENTS.get(phone)
         if not context:
             raise Exception("Session expired or not found")
-        
+
         client = context["client"]
+        # On SessionPasswordNeededError (2FA/cloud password enabled), this
+        # intentionally propagates without touching PENDING_LOGIN_CLIENTS —
+        # the client stays connected and pending so verify_password() can
+        # resume the same login a moment later.
         await client.sign_in(phone, code, phone_code_hash=context["phone_code_hash"])
+        await self._save_session(client, phone, context, db)
+        return True
+
+    async def verify_password(self, phone: str, password: str, db: Session):
+        context = PENDING_LOGIN_CLIENTS.get(phone)
+        if not context:
+            raise Exception("Session expired or not found")
+
+        client = context["client"]
+        await client.sign_in(password=password)
         await self._save_session(client, phone, context, db)
         return True
 

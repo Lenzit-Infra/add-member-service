@@ -1,4 +1,6 @@
 # app/services/health.py
+import os
+import json
 import socket
 import socks
 from datetime import datetime
@@ -6,6 +8,20 @@ from sqlalchemy import text
 from app.repositories.settings_repo import SettingsRepository
 from app.core import config
 from app.core.telegram_proxy import get_proxy
+
+_XRAY_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "xray-config.json")
+
+
+def _current_proxy_count() -> int:
+    """Reads the live count from the generated xray-config.json (ground
+    truth — reflects whatever the subscription/static list resolved to most
+    recently), falling back to the static .env list if that file doesn't exist yet."""
+    try:
+        with open(_XRAY_CONFIG_PATH, "r", encoding="utf-8") as f:
+            outbounds = json.load(f).get("outbounds", [])
+        return max(0, len(outbounds) - 1)  # minus the "direct" fallback
+    except (OSError, json.JSONDecodeError):
+        return len(config.TELEGRAM_PROXIES)
 
 _WORKER_HEARTBEAT_KEY = "_worker_heartbeat_at"
 _TELEGRAM_REACHABLE_KEY = "_telegram_reachable"
@@ -61,7 +77,7 @@ def record_telegram_reachability(db, reachable: bool):
 
 def get_status(db) -> dict:
     repo = SettingsRepository(db)
-    status = {"api": "ok", "telegram_proxy_count": len(config.TELEGRAM_PROXIES)}
+    status = {"api": "ok", "telegram_proxy_count": _current_proxy_count()}
 
     try:
         db.execute(text("SELECT 1"))
@@ -82,3 +98,21 @@ def get_status(db) -> dict:
     status["telegram_checked_at"] = repo.get_setting(_TELEGRAM_CHECKED_AT_KEY)
 
     return status
+
+
+def classify_status(data: dict) -> tuple:
+    """Reduces a /health payload (or None, if the request itself failed) to a
+    coarse (status, issues) pair — shared by the frontend-equivalent logic and
+    scripts/health_watchdog.py, so "what counts as degraded" is defined once."""
+    if data is None:
+        return "down", ["No response from the API"]
+
+    issues = []
+    if data.get("database") != "ok":
+        issues.append("database unreachable")
+    if data.get("worker") != "ok":
+        issues.append(f"worker {data.get('worker')}")
+    if data.get("telegram_reachable") is False:
+        issues.append("Telegram unreachable from the server")
+
+    return ("degraded", issues) if issues else ("ok", [])

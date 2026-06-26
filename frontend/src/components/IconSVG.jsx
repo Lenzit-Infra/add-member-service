@@ -19,7 +19,9 @@ const IconSVG = ({ name, size = 18, className, style, color }) => {
         Trash2: "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16zM10 11v6M14 11v6",
         Ban: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zM4.93 4.93l14.14 14.14",
         TrendingUp: "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
-        RefreshCw: "M21 2v6h-6M3 22v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L21 8M20.49 15a9 9 0 0 1-14.85 3.36L3 16"
+        RefreshCw: "M21 2v6h-6M3 22v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L21 8M20.49 15a9 9 0 0 1-14.85 3.36L3 16",
+        ChevronLeft: "M15 18l-6-6 6-6",
+        ChevronRight: "M9 18l6-6-6-6"
     };
     return (
         <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>

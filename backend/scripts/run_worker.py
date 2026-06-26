@@ -12,6 +12,7 @@ import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.worker_service import WorkerService
 from app.services.movement_monitor_service import MovementMonitorService
+from app.services.backup_service import backup_database
 from app.core.database import Base, engine, SessionLocal
 from app.core.migrations import run_lightweight_migrations
 from app.repositories.settings_repo import SettingsRepository
@@ -61,12 +62,19 @@ async def start_scheduler():
         id='movement_monitor'
     )
 
+    # 2c. Daily database backup (SQLite online backup API — safe against a live,
+    # actively-written-to DB). Runs once at startup too, so a fresh deployment
+    # gets its first backup immediately instead of waiting up to 24h.
+    scheduler.add_job(backup_database, 'interval', hours=24, id='db_backup')
+    backup_database()
+
     # 3. Start the scheduler (now called within the asyncio context)
     scheduler.start()
 
     print("Scheduler initialized. Press Ctrl+C to exit.")
     print(f"Worker is now checking for active orders every {WORKER_CHECK_INTERVAL_SECONDS} seconds.")
     print(f"Member Movement Monitor is checking target groups every {MOVEMENT_MONITOR_INTERVAL_MINUTES} minutes.")
+    print("Database backup runs every 24 hours (backend/backups/, last 14 kept).")
     
     # 4. Keep the asyncio loop running indefinitely
     try:

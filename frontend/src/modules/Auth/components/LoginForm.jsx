@@ -4,12 +4,14 @@ import { authApi } from '../api';
 
 export default function LoginForm({ onSuccess }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({ phone: '', api_id: '', api_hash: '', code: '' });
+  const [formData, setFormData] = useState({ phone: '', api_id: '', api_hash: '', code: '', password: '' });
   const [hash, setHash] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleRequestCode = async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await authApi.requestCode({
         phone: formData.phone,
@@ -19,7 +21,7 @@ export default function LoginForm({ onSuccess }) {
       setHash(res.data.phone_code_hash);
       setStep(2);
     } catch (err) {
-      alert("Error requesting code. Check console.");
+      setError(err.response?.data?.detail || "Error requesting code");
     } finally {
       setLoading(false);
     }
@@ -27,16 +29,38 @@ export default function LoginForm({ onSuccess }) {
 
   const handleVerify = async () => {
     setLoading(true);
+    setError('');
     try {
-      await authApi.verifyCode({
+      const res = await authApi.verifyCode({
         phone: formData.phone,
         code: formData.code,
         phone_code_hash: hash
       });
+      if (res.data.status === 'password_required') {
+        setStep(3);
+        return;
+      }
       alert("Agent Added Successfully!");
       if (onSuccess) onSuccess();
     } catch (err) {
-      alert("Verification Failed");
+      setError(err.response?.data?.detail || "Verification Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyPassword = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await authApi.verifyPassword({
+        phone: formData.phone,
+        password: formData.password,
+      });
+      alert("Agent Added Successfully!");
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Incorrect password");
     } finally {
       setLoading(false);
     }
@@ -44,7 +68,9 @@ export default function LoginForm({ onSuccess }) {
 
   return (
     <div>
-      {step === 1 ? (
+      {error && <div className="auth-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+      {step === 1 && (
         <div>
           <div className="input-group">
             <label className="input-label">Phone Number</label>
@@ -77,7 +103,9 @@ export default function LoginForm({ onSuccess }) {
             {loading ? 'Sending...' : 'Send Code'}
           </button>
         </div>
-      ) : (
+      )}
+
+      {step === 2 && (
         <div>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>Code sent to {formData.phone}</p>
           <div className="input-group">
@@ -90,6 +118,26 @@ export default function LoginForm({ onSuccess }) {
             />
           </div>
           <button disabled={loading} className="btn-primary" style={{ width: '100%' }} onClick={handleVerify}>
+            {loading ? 'Verifying...' : 'Verify & Login'}
+          </button>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>
+            This account has two-step verification enabled — enter its cloud password.
+          </p>
+          <div className="input-group">
+            <label className="input-label">Cloud Password</label>
+            <input
+              className="input-field"
+              type="password"
+              value={formData.password}
+              onChange={e => setFormData({ ...formData, password: e.target.value })}
+            />
+          </div>
+          <button disabled={loading} className="btn-primary" style={{ width: '100%' }} onClick={handleVerifyPassword}>
             {loading ? 'Verifying...' : 'Verify & Login'}
           </button>
         </div>

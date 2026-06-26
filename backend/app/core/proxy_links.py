@@ -7,7 +7,12 @@
 # switching needed.
 import base64
 import json
+import logging
 from urllib.parse import urlparse, parse_qs, unquote
+from app.core import config
+from app.core.proxy_subscription import fetch_subscription_links
+
+logger = logging.getLogger("proxy_links")
 
 
 def _b64decode(data: str) -> str:
@@ -126,6 +131,21 @@ def _parse_shadowsocks(link: str, tag: str) -> dict:
         "protocol": "shadowsocks",
         "settings": {"servers": [{"address": address, "port": port, "method": method, "password": password}]},
     }
+
+
+def resolve_proxy_links() -> list:
+    """Subscription URL takes priority (it self-updates on the provider's
+    side); the static TELEGRAM_PROXIES list in .env is the fallback, used
+    if no subscription is configured or the fetch fails."""
+    if config.TELEGRAM_PROXY_SUBSCRIPTION_URL:
+        try:
+            links = fetch_subscription_links(config.TELEGRAM_PROXY_SUBSCRIPTION_URL)
+            if links:
+                return links
+            logger.warning("Proxy subscription returned no links — falling back to static TELEGRAM_PROXIES")
+        except Exception:
+            logger.exception("Failed to fetch proxy subscription — falling back to static TELEGRAM_PROXIES")
+    return config.TELEGRAM_PROXIES
 
 
 def parse_proxy_link(link: str, tag: str) -> dict:

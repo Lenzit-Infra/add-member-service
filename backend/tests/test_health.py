@@ -14,3 +14,27 @@ def test_health_reflects_worker_heartbeat(client, db_session):
     health.record_worker_heartbeat(db_session)
     resp = client.get("/api/v1/health")
     assert resp.json()["worker"] == "ok"
+
+
+def test_classify_status_down_when_no_response():
+    from app.services.health import classify_status
+
+    status, issues = classify_status(None)
+    assert status == "down"
+    assert issues
+
+
+def test_classify_status_ok_when_everything_fine():
+    from app.services.health import classify_status
+
+    status, issues = classify_status({"database": "ok", "worker": "ok", "telegram_reachable": True})
+    assert status == "ok"
+    assert issues == []
+
+
+def test_classify_status_degraded_lists_each_issue():
+    from app.services.health import classify_status
+
+    status, issues = classify_status({"database": "error", "worker": "stale", "telegram_reachable": False})
+    assert status == "degraded"
+    assert len(issues) == 3

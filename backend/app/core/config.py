@@ -41,10 +41,23 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", SMTP_USER)
 
-# vless:// / vmess:// / ss:// links — every Telethon connection (agent
-# onboarding, the worker) routes through a local Xray-core instance fed by
-# this list instead of connecting to Telegram directly (this network blocks
-# that). Add/remove/reorder links here, then re-run
-# scripts/generate_xray_config.py and restart xray-core.
+# Every Telethon connection (agent onboarding, the worker) routes through a
+# local Xray-core instance instead of connecting to Telegram directly (this
+# network blocks that). TELEGRAM_PROXY_SUBSCRIPTION_URL — if set — is
+# refetched periodically by scripts/proxy_supervisor.py and takes priority;
+# TELEGRAM_PROXIES (comma-separated vless/vmess/ss links) is the static
+# fallback used if no subscription is configured or a fetch fails.
+TELEGRAM_PROXY_SUBSCRIPTION_URL = os.getenv("TELEGRAM_PROXY_SUBSCRIPTION_URL", "").strip()
 TELEGRAM_PROXIES = [p.strip() for p in os.getenv("TELEGRAM_PROXIES", "").split(",") if p.strip()]
 TELEGRAM_PROXY_SOCKS_PORT = int(os.getenv("TELEGRAM_PROXY_SOCKS_PORT", "11080"))
+TELEGRAM_PROXY_REFRESH_MINUTES = int(os.getenv("TELEGRAM_PROXY_REFRESH_MINUTES", "30"))
+XRAY_BINARY_PATH = os.getenv(
+    "XRAY_BINARY_PATH",
+    r"C:\Users\ASUS\AppData\Local\Microsoft\WinGet\Packages\XTLS.Xray-core_Microsoft.Winget.Source_8wekyb3d8bbwe\xray.exe",
+)
+
+# Optional: a Telegram bot (create one via @BotFather, free, no new infra)
+# that scripts/health_watchdog.py uses to DM the owner when /health turns
+# degraded/down, and again when it recovers. Disabled (no-op) if either is blank.
+ALERT_BOT_TOKEN = os.getenv("ALERT_BOT_TOKEN", "").strip()
+ALERT_CHAT_ID = os.getenv("ALERT_CHAT_ID", "").strip()

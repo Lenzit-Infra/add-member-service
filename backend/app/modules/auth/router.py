@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from telethon.errors import SessionPasswordNeededError
 from app.core.database import get_db
 from app.modules.account.dependencies import require_permission
-from .schemas import LoginRequest, VerifyCodeRequest
+from .schemas import LoginRequest, VerifyCodeRequest, VerifyPasswordRequest
 from .service import AuthService
 
 router = APIRouter()
@@ -22,6 +23,16 @@ async def request_code(data: LoginRequest):
 async def verify_code(data: VerifyCodeRequest, db: Session = Depends(get_db)):
     try:
         await auth_service.verify_code(data.phone, data.code, db)
+        return {"status": "success", "message": "Agent Added"}
+    except SessionPasswordNeededError:
+        return {"status": "password_required", "message": "Two-step verification is enabled — enter the cloud password."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/verify-password", dependencies=[Depends(require_permission("agents.manage"))])
+async def verify_password(data: VerifyPasswordRequest, db: Session = Depends(get_db)):
+    try:
+        await auth_service.verify_password(data.phone, data.password, db)
         return {"status": "success", "message": "Agent Added"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

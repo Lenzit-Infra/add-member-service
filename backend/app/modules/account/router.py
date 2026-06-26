@@ -1,4 +1,5 @@
 # app/modules/account/router.py
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -162,16 +163,38 @@ def update_role_permissions(role: str, data: RolePermissionsUpdate, current_user
     return {"role": role, "permissions": sorted(updated)}
 
 
+def _audit_entry(a) -> dict:
+    return {
+        "id": a.id,
+        "actor_username": a.actor_username,
+        "action": a.action,
+        "target": a.target,
+        "details": a.details,
+        "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+    }
+
+
 @router.get("/audit-log", dependencies=[Depends(require_permission("users.manage"))])
-def get_audit_log(db: Session = Depends(get_db)):
-    return [
-        {
-            "id": a.id,
-            "actor_username": a.actor_username,
-            "action": a.action,
-            "target": a.target,
-            "details": a.details,
-            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
-        }
-        for a in audit.get_recent(db)
-    ]
+def get_audit_log(
+    actor: str = None,
+    action: str = None,
+    date_from: str = None,
+    date_to: str = None,
+    page: int = 1,
+    page_size: int = 25,
+    db: Session = Depends(get_db),
+):
+    parsed_from = datetime.fromisoformat(date_from) if date_from else None
+    parsed_to = datetime.fromisoformat(date_to) if date_to else None
+    items, total = audit.search(db, actor=actor, action=action, date_from=parsed_from, date_to=parsed_to, page=page, page_size=page_size)
+    return {
+        "items": [_audit_entry(a) for a in items],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.get("/audit-log/actions", dependencies=[Depends(require_permission("users.manage"))])
+def get_audit_log_actions(db: Session = Depends(get_db)):
+    return {"actions": audit.list_actions(db)}

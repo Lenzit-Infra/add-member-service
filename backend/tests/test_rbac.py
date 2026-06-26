@@ -111,7 +111,7 @@ def test_cannot_delete_self(authed_client, role_client):
 def test_mutating_action_writes_audit_log(authed_client):
     authed_client.post("/api/v1/analytics/settings", json={"key": "batch_size", "value": "12"})
     log = authed_client.get("/api/v1/account/audit-log").json()
-    assert any(entry["action"] == "settings.update" for entry in log)
+    assert any(entry["action"] == "settings.update" for entry in log["items"])
 
 
 def test_login_records_client_ip(client, db_session):
@@ -129,3 +129,32 @@ def test_login_records_client_ip(client, db_session):
 
     user = db_session.query(User).filter(User.username == "ipcheck").first()
     assert user.last_login_ip == "203.0.113.5"
+
+
+def test_audit_log_pagination_and_filtering(authed_client):
+    for i in range(30):
+        authed_client.post("/api/v1/analytics/settings", json={"key": "batch_size", "value": str(i)})
+
+    page1 = authed_client.get("/api/v1/account/audit-log", params={"page": 1, "page_size": 10}).json()
+    assert len(page1["items"]) == 10
+    assert page1["total"] >= 30
+    assert page1["page"] == 1
+
+    page2 = authed_client.get("/api/v1/account/audit-log", params={"page": 2, "page_size": 10}).json()
+    assert {e["id"] for e in page1["items"]}.isdisjoint({e["id"] for e in page2["items"]})
+
+    filtered = authed_client.get("/api/v1/account/audit-log", params={"action": "settings.update", "page_size": 100}).json()
+    assert all(e["action"] == "settings.update" for e in filtered["items"])
+
+    by_actor = authed_client.get("/api/v1/account/audit-log", params={"actor": "testadmin", "page_size": 100}).json()
+    assert all(e["actor_username"] == "testadmin" for e in by_actor["items"])
+
+    nonexistent_actor = authed_client.get("/api/v1/account/audit-log", params={"actor": "nobody-like-this"}).json()
+    assert nonexistent_actor["total"] == 0
+
+
+def test_audit_log_actions_list(authed_client):
+    authed_client.post("/api/v1/analytics/settings", json={"key": "batch_size", "value": "1"})
+    resp = authed_client.get("/api/v1/account/audit-log/actions")
+    assert resp.status_code == 200
+    assert "settings.update" in resp.json()["actions"]

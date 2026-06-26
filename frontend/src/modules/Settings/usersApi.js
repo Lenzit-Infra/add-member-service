@@ -7,5 +7,6 @@ export const usersApi = {
     remove: (id) => client.delete(`/account/users/${id}`),
     getRoles: () => client.get('/account/roles'),
     updateRolePermissions: (role, permissions) => client.post(`/account/roles/${role}/permissions`, { permissions }),
-    getAuditLog: () => client.get('/account/audit-log'),
+    getAuditLog: (params) => client.get('/account/audit-log', { params }),
+    getAuditLogActions: () => client.get('/account/audit-log/actions'),
 };

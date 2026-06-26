@@ -7,4 +7,7 @@ export const authApi = {
   
   // درخواست تایید کد
   verifyCode: (data) => client.post('/auth/verify-code', data),
+
+  // تایید پسورد دو مرحله‌ای (در صورت فعال بودن cloud password)
+  verifyPassword: (data) => client.post('/auth/verify-password', data),
 };
