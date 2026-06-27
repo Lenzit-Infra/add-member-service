@@ -8,7 +8,7 @@ const GenericListModal = ({ isOpen, onClose, title, items, columns }) => {
             <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <h3 className="modal-title">{title}</h3>
-                    <button onClick={onClose} className="icon-btn"><IconSVG name="X" /></button>
+                    <button onClick={onClose} className="icon-btn" aria-label="Close"><IconSVG name="X" /></button>
                 </div>
                 <div className="modal-body" style={{padding:0}}>
                     <table>

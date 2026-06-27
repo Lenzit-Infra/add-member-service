@@ -165,7 +165,7 @@ const UsersRolesPanel = () => {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">Add User</h3>
-                            <button className="icon-btn" onClick={() => setShowAddModal(false)}><IconSVG name="X" size={16} /></button>
+                            <button className="icon-btn" aria-label="Close" onClick={() => setShowAddModal(false)}><IconSVG name="X" size={16} /></button>
                         </div>
                         <div className="modal-body">
                             <div className="input-group">
@@ -197,7 +197,7 @@ const UsersRolesPanel = () => {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">Reset Password — {resetModalUser.username}</h3>
-                            <button className="icon-btn" onClick={() => setResetModalUser(null)}><IconSVG name="X" size={16} /></button>
+                            <button className="icon-btn" aria-label="Close" onClick={() => setResetModalUser(null)}><IconSVG name="X" size={16} /></button>
                         </div>
                         <div className="modal-body">
                             <div className="input-group">

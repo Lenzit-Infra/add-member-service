@@ -79,16 +79,16 @@ const AgentsPage = () => {
                             <td>{a.needs_review && <span className="badge badge-banned">Needs Review</span>}</td>
                             <td>
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                    <button className="icon-btn-action" title="History" onClick={() => showHistory(a)}>
+                                    <button className="icon-btn-action" title="History" aria-label="View history" onClick={() => showHistory(a)}>
                                         <IconSVG name="ListOrdered" size={14} />
                                     </button>
-                                    <button className="icon-btn-action" title={a.is_active ? 'Set Idle' : 'Set Active'} onClick={() => handleToggleActive(a.id)}>
+                                    <button className="icon-btn-action" title={a.is_active ? 'Set Idle' : 'Set Active'} aria-label={a.is_active ? 'Set Idle' : 'Set Active'} onClick={() => handleToggleActive(a.id)}>
                                         <IconSVG name="Zap" size={14} />
                                     </button>
-                                    <button className="icon-btn-action ban" title={a.is_banned ? 'Unban' : 'Ban'} onClick={() => handleToggleBan(a.id)}>
+                                    <button className="icon-btn-action ban" title={a.is_banned ? 'Unban' : 'Ban'} aria-label={a.is_banned ? 'Unban' : 'Ban'} onClick={() => handleToggleBan(a.id)}>
                                         <IconSVG name="Ban" size={14} />
                                     </button>
-                                    <button className="icon-btn-action delete" title="Remove" onClick={() => handleDelete(a.id)}>
+                                    <button className="icon-btn-action delete" title="Remove" aria-label="Remove agent" onClick={() => handleDelete(a.id)}>
                                         <IconSVG name="Trash2" size={14} />
                                     </button>
                                 </div>
@@ -106,7 +106,7 @@ const AgentsPage = () => {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">Add New Agent</h3>
-                            <button className="icon-btn" onClick={() => setShowAddModal(false)}><IconSVG name="X" size={16} /></button>
+                            <button className="icon-btn" aria-label="Close" onClick={() => setShowAddModal(false)}><IconSVG name="X" size={16} /></button>
                         </div>
                         <div className="modal-body">
                             <LoginForm onSuccess={() => { setShowAddModal(false); fetchAgents(); }} />

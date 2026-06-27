@@ -63,16 +63,16 @@ const OrdersPage = () => {
                             <td>
                                 <div style={{display:'flex', gap:6}}>
                                     {o.status === 'in_progress' && (
-                                        <button className="icon-btn-action pause" title="Pause" onClick={()=>handleAction(o.id, 'pause')}><IconSVG name="Pause" size={14}/></button>
+                                        <button className="icon-btn-action pause" title="Pause" aria-label="Pause order" onClick={()=>handleAction(o.id, 'pause')}><IconSVG name="Pause" size={14}/></button>
                                     )}
                                     {(o.status === 'paused' || o.status === 'pending_agent') && (
-                                        <button className="icon-btn-action resume" title="Resume" onClick={()=>handleAction(o.id, 'resume')}><IconSVG name="Play" size={14}/></button>
+                                        <button className="icon-btn-action resume" title="Resume" aria-label="Resume order" onClick={()=>handleAction(o.id, 'resume')}><IconSVG name="Play" size={14}/></button>
                                     )}
                                     {o.status !== 'cancelled' && o.status !== 'finished' && (
-                                        <button className="icon-btn-action cancel" title="Cancel" onClick={()=>handleAction(o.id, 'cancel')}><IconSVG name="Square" size={14}/></button>
+                                        <button className="icon-btn-action cancel" title="Cancel" aria-label="Cancel order" onClick={()=>handleAction(o.id, 'cancel')}><IconSVG name="Square" size={14}/></button>
                                     )}
                                     {(o.status === 'cancelled' || o.status === 'finished') && (
-                                        <button className="icon-btn-action delete" title="Delete" onClick={()=>handleDelete(o.id)}><IconSVG name="Trash2" size={14}/></button>
+                                        <button className="icon-btn-action delete" title="Delete" aria-label="Delete order" onClick={()=>handleDelete(o.id)}><IconSVG name="Trash2" size={14}/></button>
                                     )}
                                 </div>
                             </td>
