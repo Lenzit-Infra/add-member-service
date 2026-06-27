@@ -1,4 +1,4 @@
-# start_production.ps1
+﻿# start_production.ps1
 # Starts Xray-core (Telegram proxy), the API, the worker, and the Cloudflare
 # Tunnel as background processes. Run this manually, or drop a shortcut to it
 # in the Windows Startup folder (shell:startup) so everything comes back
@@ -40,7 +40,7 @@ Start-Process -FilePath $Python `
 Start-Sleep -Seconds 3  # give it a moment to fetch the subscription and bind the local SOCKS5 port before Telethon needs it
 
 Start-Process -FilePath $Python `
-  -ArgumentList "-c", "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=4747, app_dir=r'$BackendDir')" `
+  -ArgumentList "scripts\run_api.py" `
   -WorkingDirectory $BackendDir -WindowStyle Hidden
 
 Start-Process -FilePath $Python `
