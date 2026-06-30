@@ -15,10 +15,14 @@ class AnalyticsRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all_members(self) -> List[Dict[str, Any]]:
-        """Fetch all members for the Members Tab."""
-        members = self.db.query(Member).limit(500).all() # Limit for performance, add pagination later
-        return [
+    def get_all_members(self, page: int = 1, page_size: int = 50, search: str = "") -> Dict[str, Any]:
+        q = self.db.query(Member)
+        if search:
+            term = f"%{search}%"
+            q = q.filter(Member.username.ilike(term) | Member.first_name.ilike(term))
+        total = q.count()
+        members = q.offset((page - 1) * page_size).limit(page_size).all()
+        items = [
             {
                 "user_id": str(m.user_id),
                 "username": m.username,
@@ -30,11 +34,13 @@ class AnalyticsRepository:
             }
             for m in members
         ]
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    def get_all_groups(self) -> List[Dict[str, Any]]:
-        """Fetch all groups for the Groups Tab."""
-        groups = self.db.query(Group).all()
-        return [
+    def get_all_groups(self, page: int = 1, page_size: int = 25) -> Dict[str, Any]:
+        q = self.db.query(Group)
+        total = q.count()
+        groups = q.offset((page - 1) * page_size).limit(page_size).all()
+        items = [
             {
                 "id": str(g.id),
                 "title": g.title,
@@ -46,10 +52,13 @@ class AnalyticsRepository:
             }
             for g in groups
         ]
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    def get_order_details(self) -> List[Dict[str, Any]]:
+    def get_order_details(self, page: int = 1, page_size: int = 25) -> Dict[str, Any]:
         """Fetch detailed orders with sources and agents info."""
-        orders = self.db.query(Order).order_by(desc(Order.created_at)).all()
+        q = self.db.query(Order).order_by(desc(Order.created_at))
+        total = q.count()
+        orders = q.offset((page - 1) * page_size).limit(page_size).all()
         result = []
         for order in orders:
             # 1. Fetch Source Groups
@@ -84,11 +93,11 @@ class AnalyticsRepository:
                 "current_count": order.current_count,
                 "progress_percent": round((order.current_count / order.desired_count) * 100, 1) if order.desired_count > 0 else 0,
                 "created_at": order.created_at.strftime("%Y-%m-%d %H:%M"),
-                "ended_at": "-", # Placeholder, add logic if needed
+                "ended_at": "-",
                 "sources": sources,
                 "agents": agents_info
             })
-        return result
+        return {"items": result, "total": total, "page": page, "page_size": page_size}
 
     def get_agent_performance_summary(self) -> List[Dict[str, Any]]:
         """Per-agent stats + live Telegram-capacity status (answers 'what's

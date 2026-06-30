@@ -10,9 +10,8 @@ from .schemas import OrderCreate, OrderAction
 router = APIRouter()
 
 @router.get("/")
-def get_orders(db: Session = Depends(get_db)):
-    repo = AnalyticsRepository(db)
-    return repo.get_order_details()
+def get_orders(page: int = 1, page_size: int = 25, db: Session = Depends(get_db)):
+    return AnalyticsRepository(db).get_order_details(page=page, page_size=page_size)
 
 @router.post("/", dependencies=[Depends(require_permission("orders.manage"))])
 async def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):

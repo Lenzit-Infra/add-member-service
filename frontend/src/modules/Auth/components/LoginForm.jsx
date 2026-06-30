@@ -1,8 +1,10 @@
 // src/modules/Auth/components/LoginForm.jsx
 import React, { useState } from 'react';
 import { authApi } from '../api';
+import { useToast } from '../../../context/ToastContext';
 
 export default function LoginForm({ onSuccess }) {
+  const showToast = useToast();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({ phone: '', api_id: '', api_hash: '', code: '', password: '' });
   const [hash, setHash] = useState('');
@@ -40,7 +42,7 @@ export default function LoginForm({ onSuccess }) {
         setStep(3);
         return;
       }
-      alert("Agent Added Successfully!");
+      showToast('Agent added successfully!', 'success');
       if (onSuccess) onSuccess();
     } catch (err) {
       setError(err.response?.data?.detail || "Verification Failed");
@@ -57,7 +59,7 @@ export default function LoginForm({ onSuccess }) {
         phone: formData.phone,
         password: formData.password,
       });
-      alert("Agent Added Successfully!");
+      showToast('Agent added successfully!', 'success');
       if (onSuccess) onSuccess();
     } catch (err) {
       setError(err.response?.data?.detail || "Incorrect password");

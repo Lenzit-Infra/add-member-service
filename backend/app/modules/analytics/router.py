@@ -27,14 +27,12 @@ def get_summary(db: Session = Depends(get_db)):
     }
 
 @router.get("/members")
-def get_members(db: Session = Depends(get_db)):
-    repo = AnalyticsRepository(db)
-    return repo.get_all_members()
+def get_members(page: int = 1, page_size: int = 50, search: str = "", db: Session = Depends(get_db)):
+    return AnalyticsRepository(db).get_all_members(page=page, page_size=page_size, search=search)
 
 @router.get("/groups")
-def get_groups(db: Session = Depends(get_db)):
-    repo = AnalyticsRepository(db)
-    return repo.get_all_groups()
+def get_groups(page: int = 1, page_size: int = 25, db: Session = Depends(get_db)):
+    return AnalyticsRepository(db).get_all_groups(page=page, page_size=page_size)
 
 @router.get("/movements")
 def get_movements(group_id: Optional[int] = Query(default=None), db: Session = Depends(get_db)):

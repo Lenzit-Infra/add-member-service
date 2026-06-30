@@ -7,6 +7,15 @@ from app.modules.account.dependencies import require_permission
 
 router = APIRouter()
 
+@router.get("/")
+def get_agents(page: int = 1, page_size: int = 25, db: Session = Depends(get_db)):
+    from app.repositories.analytics_repo import AnalyticsRepository
+    summary = AnalyticsRepository(db).get_agent_performance_summary()
+    total = len(summary)
+    start = (page - 1) * page_size
+    items = summary[start: start + page_size]
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
 def _get_agent_or_404(agent_id: int, db: Session) -> Agent:
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:

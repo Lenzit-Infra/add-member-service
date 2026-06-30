@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './App.css';
 import IconSVG from './components/IconSVG';
 import BackendStatus from './components/BackendStatus';
+import { ToastProvider } from './context/ToastContext';
 
 // Import Pages from Modules
 import DashboardPage from './modules/Dashboard/DashboardPage';
@@ -83,9 +84,11 @@ const AppContent = () => {
 };
 
 const App = () => (
-    <AuthProvider>
-        <AppContent />
-    </AuthProvider>
+    <ToastProvider>
+        <AuthProvider>
+            <AppContent />
+        </AuthProvider>
+    </ToastProvider>
 );
 
 export default App;

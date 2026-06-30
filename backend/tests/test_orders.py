@@ -10,8 +10,8 @@ def _create_order(client, desired_count=50):
 
 def test_create_and_list_order(authed_client):
     order_id = _create_order(authed_client)
-    orders = authed_client.get("/api/v1/orders/").json()
-    assert any(o["id"] == order_id for o in orders)
+    data = authed_client.get("/api/v1/orders/").json()
+    assert any(o["id"] == order_id for o in data["items"])
 
 
 def test_action_pause_resume_cancel(authed_client):
@@ -38,8 +38,8 @@ def test_delete_blocked_while_order_is_active(authed_client):
     resp = authed_client.delete(f"/api/v1/orders/{order_id}")
     assert resp.status_code == 400
 
-    orders = authed_client.get("/api/v1/orders/").json()
-    assert any(o["id"] == order_id for o in orders)  # still there
+    data = authed_client.get("/api/v1/orders/").json()
+    assert any(o["id"] == order_id for o in data["items"])  # still there
 
 
 def test_delete_allowed_after_cancel(authed_client):
@@ -49,8 +49,8 @@ def test_delete_allowed_after_cancel(authed_client):
     resp = authed_client.delete(f"/api/v1/orders/{order_id}")
     assert resp.status_code == 200
 
-    orders = authed_client.get("/api/v1/orders/").json()
-    assert not any(o["id"] == order_id for o in orders)
+    data = authed_client.get("/api/v1/orders/").json()
+    assert not any(o["id"] == order_id for o in data["items"])
 
 
 def test_orders_endpoint_requires_auth(client):

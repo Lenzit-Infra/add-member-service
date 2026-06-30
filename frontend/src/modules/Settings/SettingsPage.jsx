@@ -3,12 +3,15 @@ import { settingsApi } from './api';
 import IconSVG from '../../components/IconSVG';
 import UsersRolesPanel from './UsersRolesPanel';
 import AuditLogPanel from './AuditLogPanel';
+import ConfirmModal from '../../components/ConfirmModal';
+import { useToast } from '../../context/ToastContext';
 
 const ADMIN_ACCESS_TAB = 'Admin Access';
 const USERS_ROLES_TAB = 'Users & Roles';
 const AUDIT_LOG_TAB = 'Audit Log';
 
 const SettingsPage = () => {
+    const showToast = useToast();
     const [schema, setSchema] = useState([]);
     const [values, setValues] = useState({});
     const [activeTab, setActiveTab] = useState(null);
@@ -18,6 +21,7 @@ const SettingsPage = () => {
     const [emails, setEmails] = useState([]);
     const [newEmail, setNewEmail] = useState('');
     const [emailError, setEmailError] = useState('');
+    const [removeConfirm, setRemoveConfirm] = useState({ isOpen: false, email: null });
 
     const fetchSettings = () => {
         settingsApi.getAll().then(res => {
@@ -49,8 +53,9 @@ const SettingsPage = () => {
         try {
             await Promise.all(schema.map(s => settingsApi.update(s.key, String(values[s.key] ?? ''))));
             setSavedAt(new Date().toLocaleTimeString());
+            showToast('Settings saved', 'success');
         } catch (e) {
-            alert('Failed to save settings');
+            showToast('Failed to save settings', 'error');
         } finally {
             setSaving(false);
         }
@@ -69,13 +74,15 @@ const SettingsPage = () => {
         }
     };
 
-    const handleRemoveEmail = async (email) => {
-        if (!window.confirm(`Remove ${email} from the admin allowlist?`)) return;
+    const handleRemoveEmail = async () => {
+        const email = removeConfirm.email;
+        setRemoveConfirm({ isOpen: false, email: null });
         try {
             const res = await settingsApi.removeAdminEmail(email);
             setEmails(res.data.emails);
+            showToast(`Removed ${email}`, 'success');
         } catch (e) {
-            alert(e.response?.data?.detail || 'Failed to remove email');
+            showToast(e.response?.data?.detail || 'Failed to remove email', 'error');
         }
     };
 
@@ -120,7 +127,7 @@ const SettingsPage = () => {
                         {emails.map(email => (
                             <span className="admin-email-chip" key={email}>
                                 {email}
-                                <button onClick={() => handleRemoveEmail(email)} title="Remove">
+                                <button onClick={() => setRemoveConfirm({ isOpen: true, email })} title="Remove" aria-label={`Remove ${email}`}>
                                     <IconSVG name="X" size={12} />
                                 </button>
                             </span>
@@ -170,6 +177,14 @@ const SettingsPage = () => {
                     </div>
                 </>
             )}
+
+            <ConfirmModal
+                isOpen={removeConfirm.isOpen}
+                message={`Remove ${removeConfirm.email} from the admin allowlist?`}
+                confirmLabel="Remove"
+                onConfirm={handleRemoveEmail}
+                onCancel={() => setRemoveConfirm({ isOpen: false, email: null })}
+            />
         </div>
     );
 };
