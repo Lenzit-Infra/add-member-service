@@ -9,6 +9,7 @@ credentials-file: C:\Users\ASUS\.cloudflared\fd9a2b35-283c-4eb9-947f-2413cbb3055
 # spends ~60s retrying QUIC before giving up, and the Windows service never got
 # that far at all. Pin straight to HTTP/2, which works fine here.
 protocol: http2
+post-quantum: false
 
 ingress:
   - hostname: api.lenzit.ir
